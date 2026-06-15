@@ -1,19 +1,129 @@
 import { useState } from "react"
+import { supabase } from "./supabase"
 import "./App.css"
-function LogCatch() {
+function LogCatch({ onSaveCatch }) {
+  const [formData, setFormData] = useState({
+    date: "",
+    time: "",
+    species: "",
+    length: "",
+    location: "",
+    fly: "",
+    setup: "",
+    water: "",
+    notes: "",
+  })
+
+  function updateField(field, value) {
+    setFormData({
+      ...formData,
+      [field]: value,
+    })
+  }
+
+  function saveCatch() {
+    onSaveCatch({
+      id: Date.now(),
+      ...formData,
+    })
+
+    setFormData({
+      date: "",
+      time: "",
+      species: "",
+      length: "",
+      location: "",
+      fly: "",
+      setup: "",
+      water: "",
+      notes: "",
+    })
+  }
+
   return (
     <div className="panel">
-      <h2>🎣 Log Catch</h2>
-      <p>This is where the catch form will go.</p>
+      <div className="pageHeader">
+        <div>
+          <p className="eyebrow">New entry</p>
+          <h2>🎣 Log Catch</h2>
+        </div>
+      </div>
+
+      <form className="catchForm">
+        <label>
+          Date
+          <input type="date" value={formData.date} onChange={(e) => updateField("date", e.target.value)} />
+        </label>
+
+        <label>
+          Time
+          <input type="time" value={formData.time} onChange={(e) => updateField("time", e.target.value)} />
+        </label>
+
+        <label>
+          Species
+          <input type="text" placeholder="Largemouth Bass, Bluegill..." value={formData.species} onChange={(e) => updateField("species", e.target.value)} />
+        </label>
+
+        <label>
+          Length
+          <input type="text" placeholder='14.5"' value={formData.length} onChange={(e) => updateField("length", e.target.value)} />
+        </label>
+
+        <label>
+          Location
+          <input type="text" placeholder="Crescent Bend Nature Park" value={formData.location} onChange={(e) => updateField("location", e.target.value)} />
+        </label>
+
+        <label>
+          Fly Used
+          <input type="text" placeholder="Olive Woolly Bugger" value={formData.fly} onChange={(e) => updateField("fly", e.target.value)} />
+        </label>
+
+        <label>
+          Rod / Setup
+          <input type="text" placeholder="4wt, floating line, 10 lb mono" value={formData.setup} onChange={(e) => updateField("setup", e.target.value)} />
+        </label>
+
+        <label>
+          Water Conditions
+          <input type="text" placeholder="Clear, stained, muddy..." value={formData.water} onChange={(e) => updateField("water", e.target.value)} />
+        </label>
+
+        <label className="fullWidth">
+          Notes
+          <textarea placeholder="What worked, where fish were holding, weather, retrieve speed..." value={formData.notes} onChange={(e) => updateField("notes", e.target.value)} />
+        </label>
+
+        <button type="button" className="heroBtn fullWidth" onClick={saveCatch}>
+          Save Catch
+        </button>
+      </form>
     </div>
   )
 }
 
-function Journal() {
+function Journal({ catches }) {
   return (
     <div className="panel">
       <h2>📖 Journal</h2>
-      <p>Your saved catches will appear here.</p>
+
+      {catches.length === 0 ? (
+        <p>Your saved catches will appear here.</p>
+      ) : (
+        <div className="catchList">
+          {catches.map((fish) => (
+            <div className="catchCard" key={fish.id}>
+              <h3>🎣 {fish.species || "Unknown Fish"}</h3>
+              <p>📍 {fish.location || "No location"}</p>
+              <p>📏 {fish.length || "No length"}</p>
+              <p>🪰 {fish.fly || "No fly listed"}</p>
+              <p>🗓️ {fish.date || "No date"} {fish.time || ""}</p>
+              {fish.notes && <p>📝 {fish.notes}</p>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -37,6 +147,7 @@ function FlyTying() {
 } 
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
+  const [catches, setCatches] = useState([])
 
   const navItems = [
     { id: "dashboard", label: "Home", icon: "🏠" },
@@ -45,6 +156,21 @@ function App() {
     { id: "knots", label: "Knots", icon: "🪢" },
     { id: "flytying", label: "Fly Tying", icon: "🪰" },
   ]
+
+ async function handleSaveCatch(newCatch) {
+  const { error } = await supabase
+    .from("catches")
+    .insert([newCatch])
+
+  if (error) {
+    console.error(error)
+    alert("Failed to save catch.")
+    return
+  }
+
+  setCatches([newCatch, ...catches])
+  setActivePage("history")
+}
 
   return (
     <div className="app">
@@ -117,8 +243,8 @@ function App() {
               </>
     )}
 
-    {activePage === "log" && <LogCatch />}
-    {activePage === "history" && <Journal />}
+   {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} />}
+{activePage === "history" && <Journal catches={catches} />}
     {activePage === "knots" && <Knots />}
     {activePage === "flytying" && <FlyTying />}
       </main>

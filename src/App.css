@@ -211,3 +211,49 @@ h1 {
     font-size: 0.72rem;
   }
 }
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.catchForm {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.catchForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #c9d8a6;
+  font-weight: 800;
+}
+
+.catchForm input,
+.catchForm textarea {
+  width: 100%;
+  border: 1px solid rgba(244, 234, 216, 0.18);
+  border-radius: 14px;
+  background: rgba(7, 20, 13, 0.72);
+  color: #f6f0df;
+  padding: 13px 14px;
+  font: inherit;
+}
+
+.catchForm textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 700px) {
+  .catchForm {
+    grid-template-columns: 1fr;
+  }
+}
