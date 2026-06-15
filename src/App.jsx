@@ -1,92 +1,97 @@
+import { useState } from "react"
+import "./App.css"
+
 function App() {
+  const [activePage, setActivePage] = useState("dashboard")
+
+  const navItems = [
+    { id: "dashboard", label: "Home", icon: "🏠" },
+    { id: "log", label: "Log Catch", icon: "🎣" },
+    { id: "history", label: "Journal", icon: "📖" },
+    { id: "knots", label: "Knots", icon: "🪢" },
+    { id: "flytying", label: "Fly Tying", icon: "🪰" },
+  ]
+
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#0b1f14",
-      color: "#ffffff",
-      fontFamily: "Arial, sans-serif"
-    }}>
-      <header style={{
-        background: "#133322",
-        padding: "20px",
-        borderBottom: "2px solid #2f6b44"
-      }}>
-        <h1>🎣 HoodFlyLog</h1>
+    <div className="app">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Fly fishing journal</p>
+          <h1>HoodFlyLog</h1>
+        </div>
+        <button className="primaryBtn">+ Log Catch</button>
       </header>
 
-      <div style={{
-        display: "flex",
-        minHeight: "calc(100vh - 80px)"
-      }}>
-        <aside style={{
-          width: "250px",
-          background: "#11281b",
-          padding: "20px"
-        }}>
-          <h3>Navigation</h3>
+      <main className="dashboard">
+        <section className="heroCard">
+          <div>
+            <p className="eyebrow">Today on the water</p>
+            <h2>Ready to log your next catch?</h2>
+            <p>
+              Track the water, fly, weather, photos, and notes from every trip.
+            </p>
+            <button className="heroBtn">Log a Catch</button>
+          </div>
+        </section>
 
-          <p>📊 Dashboard</p>
-          <p>🎣 Log Catch</p>
-          <p>📖 Catch History</p>
-          <p>🗺️ Maps</p>
-          <p>🪢 Knots</p>
-          <p>🪰 Fly Tying</p>
-          <p>📝 Reports</p>
-        </aside>
+        <section className="quickGrid">
+          <div className="statCard">
+            <span>🎣</span>
+            <p>Total Catches</p>
+            <h3>0</h3>
+          </div>
 
-        <main style={{
-          flex: 1,
-          padding: "30px"
-        }}>
-          <h2>Dashboard</h2>
+          <div className="statCard">
+            <span>📍</span>
+            <p>Favorite Water</p>
+            <h3>—</h3>
+          </div>
 
-          <div style={{
-            display: "flex",
-            gap: "20px",
-            flexWrap: "wrap"
-          }}>
-            <div style={{
-              background: "#163726",
-              padding: "20px",
-              borderRadius: "10px",
-              minWidth: "200px"
-            }}>
-              <h3>Total Catches</h3>
-              <h1>0</h1>
-            </div>
+          <div className="statCard">
+            <span>🏆</span>
+            <p>Biggest Fish</p>
+            <h3>0"</h3>
+          </div>
 
-            <div style={{
-              background: "#163726",
-              padding: "20px",
-              borderRadius: "10px",
-              minWidth: "200px"
-            }}>
-              <h3>Favorite Water</h3>
-              <h1>--</h1>
-            </div>
+          <div className="statCard">
+            <span>🪰</span>
+            <p>Top Fly</p>
+            <h3>—</h3>
+          </div>
+        </section>
 
-            <div style={{
-              background: "#163726",
-              padding: "20px",
-              borderRadius: "10px",
-              minWidth: "200px"
-            }}>
-              <h3>Biggest Fish</h3>
-              <h1>0"</h1>
+        <section className="contentGrid">
+          <div className="panel">
+            <h2>Recent Catches</h2>
+            <div className="emptyState">
+              <span>🐟</span>
+              <h3>No catches logged yet</h3>
+              <p>Your latest catches will show up here once we connect the log form.</p>
             </div>
           </div>
 
-          <div style={{
-            marginTop: "30px",
-            background: "#163726",
-            padding: "20px",
-            borderRadius: "10px"
-          }}>
-            <h3>Recent Catches</h3>
-            <p>No catches logged yet.</p>
+          <div className="panel">
+            <h2>Quick Tools</h2>
+            <button className="toolBtn">🪢 Open Knots Library</button>
+            <button className="toolBtn">🪰 Open Fly Tying Library</button>
+            <button className="toolBtn">🗺️ View Fishing Map</button>
+            <button className="toolBtn">📤 Export Catch Log</button>
           </div>
-        </main>
-      </div>
+        </section>
+      </main>
+
+      <nav className="bottomNav">
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            className={activePage === item.id ? "active" : ""}
+            onClick={() => setActivePage(item.id)}
+          >
+            <span>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
     </div>
   )
 }
