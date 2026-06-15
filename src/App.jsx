@@ -1,6 +1,40 @@
 import { useState } from "react"
 import "./App.css"
+function LogCatch() {
+  return (
+    <div className="panel">
+      <h2>🎣 Log Catch</h2>
+      <p>This is where the catch form will go.</p>
+    </div>
+  )
+}
 
+function Journal() {
+  return (
+    <div className="panel">
+      <h2>📖 Journal</h2>
+      <p>Your saved catches will appear here.</p>
+    </div>
+  )
+}
+
+function Knots() {
+  return (
+    <div className="panel">
+      <h2>🪢 Knots Library</h2>
+      <p>Fishing knot tutorials will live here.</p>
+    </div>
+  )
+}
+
+function FlyTying() {
+  return (
+    <div className="panel">
+      <h2>🪰 Fly Tying Library</h2>
+      <p>Fly tying tutorials will live here.</p>
+    </div>
+  )
+} 
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
 
@@ -22,17 +56,19 @@ function App() {
         <button className="primaryBtn">+ Log Catch</button>
       </header>
 
-      <main className="dashboard">
-        <section className="heroCard">
-          <div>
-            <p className="eyebrow">Today on the water</p>
-            <h2>Ready to log your next catch?</h2>
-            <p>
-              Track the water, fly, weather, photos, and notes from every trip.
-            </p>
-            <button className="heroBtn">Log a Catch</button>
-          </div>
-        </section>
+     <main className="dashboard">
+  {activePage === "dashboard" && (
+    <>
+      <section className="heroCard">
+        <div>
+          <p className="eyebrow">Today on the water</p>
+          <h2>Ready to log your next catch?</h2>
+          <p>
+            Track the water, fly, weather, photos, and notes from every trip.
+          </p>
+          <button className="heroBtn">Log a Catch</button>
+        </div>
+      </section>
 
         <section className="quickGrid">
           <div className="statCard">
@@ -78,6 +114,13 @@ function App() {
             <button className="toolBtn">📤 Export Catch Log</button>
           </div>
         </section>
+              </>
+    )}
+
+    {activePage === "log" && <LogCatch />}
+    {activePage === "history" && <Journal />}
+    {activePage === "knots" && <Knots />}
+    {activePage === "flytying" && <FlyTying />}
       </main>
 
       <nav className="bottomNav">
