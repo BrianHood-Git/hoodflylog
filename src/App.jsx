@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { supabase } from "./supabase"
+import LandingPage from "./components/LandingPage"
 import "./App.css"
 function LogCatch({ onSaveCatch }) {
   const [formData, setFormData] = useState({
@@ -145,10 +146,15 @@ function FlyTying() {
     </div>
   )
 } 
+
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
   const [catches, setCatches] = useState([])
+  const [viewMode, setViewMode] = useState("public")
 
+if (viewMode === "public") {
+  return <LandingPage onEnterApp={() => setViewMode("app")} />
+}
   const navItems = [
     { id: "dashboard", label: "Home", icon: "🏠" },
     { id: "log", label: "Log Catch", icon: "🎣" },
@@ -179,7 +185,12 @@ function App() {
           <p className="eyebrow">Fly fishing journal</p>
           <h1>HoodFlyLog</h1>
         </div>
-        <button className="primaryBtn">+ Log Catch</button>
+        <button
+  className="primaryBtn"
+  onClick={() => setViewMode("app")}
+>
+  Login / Dashboard
+</button>
       </header>
 
      <main className="dashboard">

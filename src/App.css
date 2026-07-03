@@ -257,3 +257,72 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+.landingPage {
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, #062016 0 230px, transparent 230px),
+    linear-gradient(180deg, rgba(244, 234, 216, .94), rgba(244, 234, 216, .98)),
+    url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80");
+  background-size: auto, auto, cover;
+  background-position: center;
+  color: #0d1b12;
+  padding: 28px;
+}
+
+.landingHeader {
+  max-width: 1180px;
+  margin: 0 auto 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.landingHero {
+  max-width: 1180px;
+  margin: 0 auto 22px;
+  padding: 48px;
+  border-radius: 24px;
+  background: rgba(255, 248, 236, .88);
+  border: 1px solid #dfd1b8;
+}
+
+.landingHero h2 {
+  max-width: 780px;
+  font-size: clamp(2.3rem, 5vw, 4.8rem);
+  line-height: 1;
+}
+
+.landingGrid {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.landingGrid .panel {
+  background: rgba(255, 248, 236, .92);
+  color: #0d1b12;
+  border: 1px solid #dfd1b8;
+}
+
+@media (max-width: 900px) {
+  .landingPage {
+    background:
+      linear-gradient(180deg, rgba(244, 234, 216, .96), rgba(244, 234, 216, .99));
+    padding: 16px;
+  }
+
+  .landingHeader {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .landingHero {
+    padding: 28px;
+  }
+
+  .landingGrid {
+    grid-template-columns: 1fr;
+  }
+}
