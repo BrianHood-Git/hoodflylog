@@ -289,3 +289,16 @@
     text-align: center;
   }
 }
+.navBtn{
+    background:none;
+    border:none;
+    color:#17301c;
+    font-size:1rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.navBtn:hover{
+    color:#6b8e23;
+}

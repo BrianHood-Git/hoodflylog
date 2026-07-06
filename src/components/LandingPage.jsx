@@ -12,16 +12,28 @@ function LandingPage({ onEnterApp }) {
         </div>
 
         <div className="landingMenu">
-          <button className="primaryBtn">
-            Explore Catches
-          </button>
+         <button className="navBtn">
+    Explore
+</button>
 
-          <button
-            className="heroBtn"
-            onClick={onEnterApp}
-          >
-            Login / Sign Up
-          </button>
+<button className="navBtn">
+    Leaderboard
+</button>
+
+<button className="navBtn">
+    About
+</button>
+
+<button className="navBtn">
+    Contact
+</button>
+
+<button
+    className="heroBtn"
+    onClick={onEnterApp}
+>
+    Login / Sign Up
+</button>
         </div>
 
       </header>
