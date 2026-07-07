@@ -194,19 +194,140 @@ function Journal({ catches }) {
 }
 
 function Knots() {
+  const knots = [
+    {
+      name: "Improved Clinch Knot",
+      use: "Fly to tippet",
+      notes: "Fast everyday knot for dries, nymphs, and small streamers. Use 5 to 7 wraps, wet it, and seat it slowly.",
+      steps: ["Thread the eye", "Wrap tag around standing line", "Pass tag through loop near eye", "Pass through big loop", "Wet and tighten"],
+    },
+    {
+      name: "Non-Slip Loop Knot",
+      use: "Streamers and articulated flies",
+      notes: "Leaves a small loop so the fly moves freely. Great for woolly buggers, baitfish, and bass flies.",
+      steps: ["Tie overhand loop", "Pass tag through fly eye", "Run tag back through loop", "Wrap tag 4 to 5 times", "Return through loop and tighten"],
+    },
+    {
+      name: "Surgeon's Knot",
+      use: "Tippet to tippet",
+      notes: "Quick way to add lighter tippet or repair a leader. Good in wind or low light.",
+      steps: ["Overlap both lines", "Make a loop with both lines", "Pass tag ends through twice", "Wet and pull all strands evenly"],
+    },
+    {
+      name: "Blood Knot",
+      use: "Clean leader sections",
+      notes: "Slimmer than a surgeon's knot and passes through guides well. Best with similar line diameters.",
+      steps: ["Overlap lines", "Wrap one tag 5 times", "Bring tag to center", "Wrap other tag opposite way", "Wet and pull tight"],
+    },
+    {
+      name: "Perfection Loop",
+      use: "Loop at end of leader",
+      notes: "Makes a straight, clean loop for loop-to-loop leader connections.",
+      steps: ["Form first loop", "Wrap tag behind standing line", "Form second loop", "Pull second loop through first", "Trim tag"],
+    },
+    {
+      name: "Nail Knot",
+      use: "Fly line to leader",
+      notes: "Classic low-profile connection. A small tube or nail knot tool makes it much easier.",
+      steps: ["Lay tube along fly line", "Wrap leader around tube and fly line", "Pass tag through tube", "Remove tube", "Wet and tighten"],
+    },
+  ]
+
   return (
     <div className="panel">
       <h2>🪢 Knots Library</h2>
-      <p>Fishing knot tutorials will live here.</p>
+      <div className="libraryGrid">
+        {knots.map((knot) => (
+          <article className="libraryCard" key={knot.name}>
+            <p className="eyebrow">{knot.use}</p>
+            <h3>{knot.name}</h3>
+            <p>{knot.notes}</p>
+            <ol>
+              {knot.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </article>
+        ))}
+      </div>
     </div>
   )
 }
 
 function FlyTying() {
+  const flies = [
+    {
+      name: "Woolly Bugger",
+      type: "Streamer",
+      bestFor: "Bass, trout, panfish",
+      materials: "Marabou tail, chenille body, hackle, bead optional",
+      tip: "Olive, black, and brown are confidence colors. Strip it slow around structure or swing it in current.",
+    },
+    {
+      name: "Clouser Minnow",
+      type: "Baitfish",
+      bestFor: "Bass, saltwater, trout",
+      materials: "Bucktail, dumbbell eyes, flash, strong hook",
+      tip: "Sparse is better. Invert the hook with dumbbell eyes and fish it with short strips.",
+    },
+    {
+      name: "Pheasant Tail Nymph",
+      type: "Nymph",
+      bestFor: "Trout and panfish",
+      materials: "Pheasant tail fibers, copper wire, peacock herl, thread",
+      tip: "A great mayfly nymph imitation. Fish under an indicator or as the smaller fly in a two-fly rig.",
+    },
+    {
+      name: "Zebra Midge",
+      type: "Midge",
+      bestFor: "Trout",
+      materials: "Thread body, wire rib, bead",
+      tip: "Simple and tiny. Black, red, and olive work well when fish are eating small bugs.",
+    },
+    {
+      name: "Elk Hair Caddis",
+      type: "Dry fly",
+      bestFor: "Trout and creek fish",
+      materials: "Dry fly hackle, dubbing, elk hair wing",
+      tip: "Floats well in broken water. Trim the wing clean and use floatant before fishing.",
+    },
+    {
+      name: "San Juan Worm",
+      type: "Attractor nymph",
+      bestFor: "Trout, carp, panfish",
+      materials: "Chenille or worm material, thread, bead optional",
+      tip: "Excellent after rain or in stained water. Red, pink, wine, and brown are common choices.",
+    },
+    {
+      name: "Foam Hopper",
+      type: "Terrestrial",
+      bestFor: "Bass, bluegill, trout",
+      materials: "Foam body, rubber legs, elk/deer hair wing optional",
+      tip: "Good summer searching fly. Twitch it near banks, grass, and overhanging cover.",
+    },
+    {
+      name: "Bully Bluegill Spider",
+      type: "Warmwater bug",
+      bestFor: "Bluegill and bass",
+      materials: "Foam or chenille body, rubber legs, small hook",
+      tip: "Let the rings settle after it lands, then twitch once. Panfish usually tell on themselves.",
+    },
+  ]
+
   return (
     <div className="panel">
       <h2>🪰 Fly Tying Library</h2>
-      <p>Fly tying tutorials will live here.</p>
+      <div className="libraryGrid">
+        {flies.map((fly) => (
+          <article className="libraryCard" key={fly.name}>
+            <p className="eyebrow">{fly.type}</p>
+            <h3>{fly.name}</h3>
+            <p><strong>Best for:</strong> {fly.bestFor}</p>
+            <p><strong>Materials:</strong> {fly.materials}</p>
+            <p>{fly.tip}</p>
+          </article>
+        ))}
+      </div>
     </div>
   )
 } 
@@ -272,7 +393,7 @@ function App() {
   }, [catches])
 
   if (viewMode === "public") {
-    return <LandingPage onEnterApp={() => setViewMode("app")} />
+    return <LandingPage catches={catches} onEnterApp={() => setViewMode("app")} />
   }
 
   const navItems = [
