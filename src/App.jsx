@@ -352,9 +352,9 @@ function Profile({ profile, user, onSaveProfile }) {
   async function saveProfile() {
     setMessage("")
     setIsSaving(true)
-    const saved = await onSaveProfile(formData)
+    const result = await onSaveProfile(formData)
     setIsSaving(false)
-    setMessage(saved ? "Profile saved." : "Profile could not be saved.")
+    setMessage(result.ok ? "Profile saved." : result.error)
   }
 
   return (
@@ -792,17 +792,22 @@ async function saveProfile(formData) {
 
   const { data, error } = await supabase
     .from("profiles")
-    .upsert(profileToSave)
+    .upsert(profileToSave, { onConflict: "id" })
     .select()
     .single()
 
   if (error) {
     console.error(error)
-    return false
+    return {
+      ok: false,
+      error: error.message || "Profile could not be saved.",
+    }
   }
 
   setProfile(data)
-  return true
+  return {
+    ok: true,
+  }
 }
 
   return (
