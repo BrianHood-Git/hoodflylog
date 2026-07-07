@@ -47,6 +47,13 @@
   color: #185734;
 }
 
+#public-catches,
+#leaderboard,
+#about,
+#contact {
+  scroll-margin-top: 18px;
+}
+
 .heroSection {
   max-width: 1180px;
   min-height: 520px;

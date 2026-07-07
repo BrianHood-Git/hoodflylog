@@ -497,7 +497,7 @@ function App() {
     const saved = localStorage.getItem("hoodflylog-catches")
     return saved ? JSON.parse(saved) : []
   })
-  const [viewMode, setViewMode] = useState("public")
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem("hoodflylog-view-mode") || "public")
   const [loadStatus, setLoadStatus] = useState("Loading catch log...")
   const [selectedPhoto, setSelectedPhoto] = useState(null)
   const [session, setSession] = useState(null)
@@ -510,16 +510,27 @@ function App() {
   }, [catches])
 
   useEffect(() => {
+    localStorage.setItem("hoodflylog-view-mode", viewMode)
+  }, [viewMode])
+
+  useEffect(() => {
     async function loadSession() {
       const { data } = await supabase.auth.getSession()
-      setSession(data.session)
+      const nextSession = data.session
+      setSession(nextSession)
+      if (nextSession) {
+        setViewMode("app")
+      }
       setAuthLoading(false)
     }
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession)
+      if (nextSession) {
+        setViewMode("app")
+        setActivePage("dashboard")
+      }
       setAuthLoading(false)
-      setActivePage("dashboard")
     })
 
     loadSession()
@@ -610,10 +621,6 @@ function App() {
     }
   }, [catches])
 
-  if (viewMode === "public") {
-    return <LandingPage catches={catches} onEnterApp={() => setViewMode("app")} />
-  }
-
   if (authLoading) {
     return (
       <div className="authShell">
@@ -622,6 +629,10 @@ function App() {
         </div>
       </div>
     )
+  }
+
+  if (viewMode === "public") {
+    return <LandingPage catches={catches} onEnterApp={() => setViewMode("app")} />
   }
 
   if (!user) {

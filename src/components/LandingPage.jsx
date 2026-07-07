@@ -2,6 +2,12 @@ import "./LandingPage.css"
 import logo from "../assets/hoodflylog-logo.jpg"
 
 function LandingPage({ catches = [], onEnterApp }) {
+  const navLinks = [
+    { label: "Explore", sectionId: "public-catches" },
+    { label: "Leaderboard", sectionId: "leaderboard" },
+    { label: "About", sectionId: "about" },
+    { label: "Contact", sectionId: "contact" },
+  ]
   const publicCatches = catches.filter((fish) => fish.is_public !== false)
   const recentCatches = publicCatches.slice(0, 3)
   const fallbackCatches = [
@@ -15,7 +21,11 @@ function LandingPage({ catches = [], onEnterApp }) {
   const leaderboard = buildLeaderboard(publicCatches)
 
   function scrollToSection(id) {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+    const section = document.getElementById(id)
+    if (!section) return
+
+    section.scrollIntoView({ behavior: "smooth", block: "start" })
+    window.history.replaceState(null, "", `#${id}`)
   }
 
   return (
@@ -26,11 +36,18 @@ function LandingPage({ catches = [], onEnterApp }) {
         </div>
 
         <div className="landingMenu">
-          <button className="navBtn" onClick={() => scrollToSection("public-catches")}>Explore</button>
-          <button className="navBtn" onClick={() => scrollToSection("leaderboard")}>Leaderboard</button>
-          <button className="navBtn" onClick={() => scrollToSection("about")}>About</button>
-          <button className="navBtn" onClick={() => scrollToSection("contact")}>Contact</button>
-          <button className="heroBtn" onClick={onEnterApp}>Login / Sign Up</button>
+          {navLinks.map((link) => (
+            <button
+              aria-controls={link.sectionId}
+              className="navBtn"
+              key={link.sectionId}
+              onClick={() => scrollToSection(link.sectionId)}
+              type="button"
+            >
+              {link.label}
+            </button>
+          ))}
+          <button className="heroBtn" onClick={onEnterApp} type="button">Login / Sign Up</button>
         </div>
       </header>
 
@@ -48,8 +65,8 @@ function LandingPage({ catches = [], onEnterApp }) {
           </p>
 
           <div className="heroButtons">
-            <button className="heroBtn" onClick={onEnterApp}>Join Free</button>
-            <button className="primaryBtn" onClick={() => scrollToSection("public-catches")}>Explore Public Catches</button>
+            <button className="heroBtn" onClick={onEnterApp} type="button">Join Free</button>
+            <button className="primaryBtn" onClick={() => scrollToSection("public-catches")} type="button">Explore Public Catches</button>
           </div>
         </div>
       </section>
@@ -82,7 +99,7 @@ function LandingPage({ catches = [], onEnterApp }) {
             <p className="eyebrow">Community feed</p>
             <h2>Recent Public Catches</h2>
           </div>
-          <button className="primaryBtn" onClick={onEnterApp}>Explore All</button>
+          <button className="primaryBtn" onClick={onEnterApp} type="button">Explore All</button>
         </div>
 
         <div className="catchPreviewGrid">
@@ -107,7 +124,7 @@ function LandingPage({ catches = [], onEnterApp }) {
             <p className="eyebrow">Top catches</p>
             <h2>Leaderboard</h2>
           </div>
-          <button className="primaryBtn" onClick={onEnterApp}>Log a Catch</button>
+          <button className="primaryBtn" onClick={onEnterApp} type="button">Log a Catch</button>
         </div>
 
         <div className="leaderboardList">
