@@ -332,6 +332,95 @@ function FlyTying() {
   )
 } 
 
+function Profile({ profile, user, onSaveProfile }) {
+  const [formData, setFormData] = useState(() => ({
+    display_name: profile?.display_name || "",
+    home_water: profile?.home_water || "",
+    hometown: profile?.hometown || "",
+    bio: profile?.bio || "",
+  }))
+  const [message, setMessage] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+
+  function updateField(field, value) {
+    setFormData({
+      ...formData,
+      [field]: value,
+    })
+  }
+
+  async function saveProfile() {
+    setMessage("")
+    setIsSaving(true)
+    const saved = await onSaveProfile(formData)
+    setIsSaving(false)
+    setMessage(saved ? "Profile saved." : "Profile could not be saved.")
+  }
+
+  return (
+    <div className="panel">
+      <div className="pageHeader">
+        <div>
+          <p className="eyebrow">Angler profile</p>
+          <h2>👤 Profile</h2>
+        </div>
+      </div>
+
+      <div className="profileSummary">
+        <div className="profileAvatar">{getInitials(profile?.display_name || user.email)}</div>
+        <div>
+          <h3>{profile?.display_name || "New Angler"}</h3>
+          <p>{profile?.home_water || "Add your home water"}</p>
+        </div>
+      </div>
+
+      <form className="catchForm">
+        <label>
+          Display Name
+          <input type="text" placeholder="Hood" value={formData.display_name} onChange={(event) => updateField("display_name", event.target.value)} />
+        </label>
+
+        <label>
+          Home Water
+          <input type="text" placeholder="Guadalupe River" value={formData.home_water} onChange={(event) => updateField("home_water", event.target.value)} />
+        </label>
+
+        <label>
+          Hometown
+          <input type="text" placeholder="Victoria, TX" value={formData.hometown} onChange={(event) => updateField("hometown", event.target.value)} />
+        </label>
+
+        <label>
+          Email
+          <input type="email" value={user.email} disabled />
+        </label>
+
+        <label className="fullWidth">
+          Bio
+          <textarea placeholder="Favorite water, favorite flies, target species..." value={formData.bio} onChange={(event) => updateField("bio", event.target.value)} />
+        </label>
+
+        <button type="button" className="heroBtn fullWidth" onClick={saveProfile}>
+          {isSaving ? "Saving..." : "Save Profile"}
+        </button>
+        {message && <p className="formMessage fullWidth">{message}</p>}
+      </form>
+    </div>
+  )
+}
+
+function ProfilePreview({ profile, user, onOpenProfile }) {
+  return (
+    <button className="profilePreview" onClick={onOpenProfile}>
+      <span>{getInitials(profile?.display_name || user.email)}</span>
+      <div>
+        <strong>{profile?.display_name || "Set up profile"}</strong>
+        <p>{profile?.home_water || "Add home water"}</p>
+      </div>
+    </button>
+  )
+}
+
 function AuthPanel() {
   const [mode, setMode] = useState("signIn")
   const [email, setEmail] = useState("")
@@ -413,6 +502,7 @@ function App() {
   const [selectedPhoto, setSelectedPhoto] = useState(null)
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [profile, setProfile] = useState(null)
   const user = session?.user
   
   useEffect(() => {
@@ -438,6 +528,32 @@ function App() {
       listener.subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    async function loadProfile() {
+      if (!user) {
+        setProfile(null)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (error) {
+        console.error(error)
+        return
+      }
+
+      if (data) {
+        setProfile(data)
+      }
+    }
+
+    loadProfile()
+  }, [user])
 
   useEffect(() => {
     async function loadCatches() {
@@ -519,6 +635,11 @@ function App() {
     { id: "knots", label: "Knots", icon: "🪢" },
     { id: "flytying", label: "Fly Tying", icon: "🪰" },
   ]
+  const sidebarItems = [
+    ...navItems,
+    { id: "profile", label: "Profile", icon: "👤" },
+  ]
+  const displayName = profile?.display_name || user.email?.split("@")[0] || "angler"
 
 async function handleSaveCatch(newCatch) {
   const { photoUploadNote, ...photoDetails } = await uploadSelectedPhoto()
@@ -658,12 +779,39 @@ async function signOut() {
   setViewMode("public")
 }
 
+async function saveProfile(formData) {
+  const profileToSave = {
+    id: user.id,
+    email: user.email,
+    display_name: formData.display_name.trim(),
+    home_water: formData.home_water.trim(),
+    hometown: formData.hometown.trim(),
+    bio: formData.bio.trim(),
+    updated_at: new Date().toISOString(),
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .upsert(profileToSave)
+    .select()
+    .single()
+
+  if (error) {
+    console.error(error)
+    return false
+  }
+
+  setProfile(data)
+  return true
+}
+
   return (
     <div className="app">
       <aside className="sideNav">
         <img src={logo} alt="HoodFlyLog" className="sideLogo" />
+        <ProfilePreview profile={profile} user={user} onOpenProfile={() => setActivePage("profile")} />
         <div className="sideNavLinks">
-          {navItems.map((item) => (
+          {sidebarItems.map((item) => (
             <button
               key={item.id}
               className={activePage === item.id ? "active" : ""}
@@ -684,9 +832,10 @@ async function signOut() {
       <header className="topbar">
         <div>
           <h1>Dashboard 🎣</h1>
-          <p>Welcome back, {user.email}! Tight lines.</p>
+          <p>Welcome back, {displayName}! Tight lines.</p>
         </div>
         <div className="topbarActions">
+          <button className="primaryBtn" onClick={() => setActivePage("profile")}>Profile</button>
           <button className="primaryBtn" onClick={() => setViewMode("public")}>Public Site</button>
           <button className="secondaryBtn" onClick={signOut}>Sign Out</button>
         </div>
@@ -771,6 +920,7 @@ async function signOut() {
 {activePage === "history" && <Journal catches={catches} />}
     {activePage === "knots" && <Knots />}
     {activePage === "flytying" && <FlyTying />}
+    {activePage === "profile" && <Profile key={profile?.updated_at || user.id} profile={profile} user={user} onSaveProfile={saveProfile} />}
       </main>
 
       <nav className="bottomNav">
@@ -813,6 +963,18 @@ function mostCommon(items, field) {
 
 function csvCell(value) {
   return `"${String(value).replaceAll('"', '""')}"`
+}
+
+function getInitials(value = "") {
+  const parts = value
+    .replace(/@.*/, "")
+    .split(/\s+|[._-]+/)
+    .filter(Boolean)
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "HF"
 }
 
 function createCatchPhotoPath(file, userId) {

@@ -34,7 +34,65 @@ body {
 .sideLogo {
   width: 211px;
   display: block;
-  margin: 0 auto 26px;
+  margin: 0 auto 18px;
+}
+
+.profilePreview {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 12px;
+  border: 1px solid rgba(201, 216, 166, 0.32);
+  border-radius: 10px;
+  background: rgba(201, 216, 166, 0.1);
+  color: #fff8ec;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profilePreview span,
+.profileAvatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #c9d8a6;
+  color: #061f14;
+  font-weight: 900;
+}
+
+.profilePreview strong {
+  display: block;
+}
+
+.profilePreview p {
+  margin: 3px 0 0;
+  color: #f6f0df;
+  font-size: 0.82rem;
+}
+
+.profileSummary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid #dfcda9;
+  border-radius: 12px;
+  background: #f6ecd9;
+}
+
+.profileSummary h3 {
+  margin-bottom: 4px;
+}
+
+.profileSummary p {
+  margin: 0;
+  color: #5d503e;
 }
 
 .sideNavLinks {
