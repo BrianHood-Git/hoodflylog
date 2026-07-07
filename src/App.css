@@ -88,6 +88,12 @@ body {
   backdrop-filter: blur(6px);
 }
 
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: #78913e;
@@ -145,6 +151,79 @@ h3 {
   background: #c9d8a6;
   border-color: #b7ca91;
   color: #061f14;
+}
+
+.authShell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(246, 239, 224, 0.88), rgba(239, 227, 203, 0.98)),
+    url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80");
+  background-size: cover;
+  background-position: center;
+}
+
+.authPanel {
+  width: min(440px, 100%);
+  padding: 24px;
+  border: 1px solid #dfcda9;
+  border-radius: 16px;
+  background: rgba(255, 248, 236, 0.95);
+  color: #061f14;
+  box-shadow: 0 18px 50px rgba(58, 40, 19, 0.16);
+}
+
+.authLogo {
+  width: 140px;
+  display: block;
+  margin-bottom: 18px;
+  border: 1px solid #dfcda9;
+}
+
+.authPanel p {
+  color: #5d503e;
+  line-height: 1.45;
+}
+
+.authForm {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.authForm label {
+  display: grid;
+  gap: 7px;
+  color: #4c493d;
+  font-weight: 800;
+}
+
+.authForm input {
+  width: 100%;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #061f14;
+  padding: 13px 14px;
+  font: inherit;
+}
+
+.authMessage {
+  margin: 14px 0 0;
+  font-weight: 700;
+}
+
+.linkBtn {
+  margin-top: 14px;
+  border: 0;
+  background: transparent;
+  color: #185734;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
 }
 
 .heroCard {
@@ -395,6 +474,11 @@ h3 {
 @media (max-width: 800px) {
   .topbar {
     align-items: flex-start;
+  }
+
+  .topbarActions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .primaryBtn {

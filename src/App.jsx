@@ -332,6 +332,75 @@ function FlyTying() {
   )
 } 
 
+function AuthPanel() {
+  const [mode, setMode] = useState("signIn")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [message, setMessage] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const isSignUp = mode === "signUp"
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setMessage("")
+    setIsSubmitting(true)
+
+    const authAction = isSignUp
+      ? supabase.auth.signUp({ email, password })
+      : supabase.auth.signInWithPassword({ email, password })
+    const { error } = await authAction
+
+    setIsSubmitting(false)
+
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+
+    setMessage(isSignUp ? "Account created. Check your email if confirmation is enabled." : "Signed in.")
+  }
+
+  return (
+    <div className="authShell">
+      <div className="authPanel">
+        <img src={logo} alt="HoodFlyLog" className="authLogo" />
+        <p className="eyebrow">Private fishing journal</p>
+        <h2>{isSignUp ? "Create your account" : "Welcome back"}</h2>
+        <p>Sign in to save catches, photos, weather notes, and trip history to your HoodFlyLog account.</p>
+
+        <form className="authForm" onSubmit={handleSubmit}>
+          <label>
+            Email
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          </label>
+
+          <label>
+            Password
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength="6" required />
+          </label>
+
+          <button type="submit" className="heroBtn">
+            {isSubmitting ? "Working..." : isSignUp ? "Create Account" : "Sign In"}
+          </button>
+        </form>
+
+        {message && <p className="authMessage">{message}</p>}
+
+        <button
+          type="button"
+          className="linkBtn"
+          onClick={() => {
+            setMode(isSignUp ? "signIn" : "signUp")
+            setMessage("")
+          }}
+        >
+          {isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
   const cameraInputRef = useRef(null)
@@ -342,17 +411,50 @@ function App() {
   const [viewMode, setViewMode] = useState("public")
   const [loadStatus, setLoadStatus] = useState("Loading catch log...")
   const [selectedPhoto, setSelectedPhoto] = useState(null)
+  const [session, setSession] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const user = session?.user
   
   useEffect(() => {
     localStorage.setItem("hoodflylog-catches", JSON.stringify(catches))
   }, [catches])
 
   useEffect(() => {
+    async function loadSession() {
+      const { data } = await supabase.auth.getSession()
+      setSession(data.session)
+      setAuthLoading(false)
+    }
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      setAuthLoading(false)
+      setActivePage("dashboard")
+    })
+
+    loadSession()
+
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
     async function loadCatches() {
-      const { data, error } = await supabase
+      setLoadStatus("Loading catch log...")
+
+      let query = supabase
         .from("catches")
         .select("*")
         .order("date", { ascending: false })
+
+      if (user) {
+        query = query.eq("user_id", user.id)
+      } else {
+        query = query.eq("is_public", true)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.error(error)
@@ -365,7 +467,7 @@ function App() {
     }
 
     loadCatches()
-  }, [])
+  }, [user])
 
   useEffect(() => {
     return () => {
@@ -396,6 +498,20 @@ function App() {
     return <LandingPage catches={catches} onEnterApp={() => setViewMode("app")} />
   }
 
+  if (authLoading) {
+    return (
+      <div className="authShell">
+        <div className="authPanel">
+          <p>Loading HoodFlyLog...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <AuthPanel />
+  }
+
   const navItems = [
     { id: "dashboard", label: "Home", icon: "🏠" },
     { id: "history", label: "Journal", icon: "📖" },
@@ -409,6 +525,7 @@ async function handleSaveCatch(newCatch) {
   const catchToSave = {
     ...newCatch,
     ...photoDetails,
+    user_id: user.id,
   }
 
   if (photoUploadNote) {
@@ -446,7 +563,7 @@ async function uploadSelectedPhoto() {
     return {}
   }
 
-  const filePath = createCatchPhotoPath(selectedPhoto.file)
+  const filePath = createCatchPhotoPath(selectedPhoto.file, user.id)
   const { error } = await supabase.storage
     .from("catch-photos")
     .upload(filePath, selectedPhoto.file, {
@@ -534,6 +651,13 @@ function handleNavClick(item) {
   setActivePage(item.id)
 }
 
+async function signOut() {
+  await supabase.auth.signOut()
+  setCatches([])
+  clearSelectedPhoto()
+  setViewMode("public")
+}
+
   return (
     <div className="app">
       <aside className="sideNav">
@@ -560,14 +684,12 @@ function handleNavClick(item) {
       <header className="topbar">
         <div>
           <h1>Dashboard 🎣</h1>
-          <p>Welcome back, Hood! Tight lines.</p>
+          <p>Welcome back, {user.email}! Tight lines.</p>
         </div>
-        <button
-  className="primaryBtn"
-  onClick={() => setViewMode("app")}
->
-  Jul 7, 2026
-</button>
+        <div className="topbarActions">
+          <button className="primaryBtn" onClick={() => setViewMode("public")}>Public Site</button>
+          <button className="secondaryBtn" onClick={signOut}>Sign Out</button>
+        </div>
       </header>
 
      <main className="dashboard">
@@ -693,7 +815,7 @@ function csvCell(value) {
   return `"${String(value).replaceAll('"', '""')}"`
 }
 
-function createCatchPhotoPath(file) {
+function createCatchPhotoPath(file, userId) {
   const extension = file.name.split(".").pop()?.toLowerCase() || "jpg"
   const safeName = file.name
     .replace(/\.[^/.]+$/, "")
@@ -702,7 +824,7 @@ function createCatchPhotoPath(file) {
     .replace(/(^-|-$)/g, "")
     .slice(0, 40) || "catch"
 
-  return `public/${Date.now()}-${crypto.randomUUID()}-${safeName}.${extension}`
+  return `users/${userId}/${Date.now()}-${crypto.randomUUID()}-${safeName}.${extension}`
 }
 
 function getCurrentPosition() {
