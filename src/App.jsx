@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { supabase } from "./supabase"
 import LandingPage from "./components/LandingPage"
+import logo from "./assets/hoodflylog-logo.jpg"
 import "./App.css"
 function LogCatch({ onSaveCatch }) {
   const [formData, setFormData] = useState({
@@ -14,6 +15,8 @@ function LogCatch({ onSaveCatch }) {
     water: "",
     notes: "",
   })
+  const [errorMessage, setErrorMessage] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
 
   function updateField(field, value) {
     setFormData({
@@ -22,11 +25,27 @@ function LogCatch({ onSaveCatch }) {
     })
   }
 
-  function saveCatch() {
-    onSaveCatch({
-      id: Date.now(),
-      ...formData,
-    })
+  async function saveCatch() {
+    const cleanedCatch = Object.fromEntries(
+      Object.entries(formData).map(([key, value]) => [key, value.trim()])
+    )
+
+    if (!cleanedCatch.species && !cleanedCatch.location && !cleanedCatch.fly && !cleanedCatch.notes) {
+      setErrorMessage("Add at least a species, location, fly, or note before saving.")
+      return
+    }
+
+    setErrorMessage("")
+    setIsSaving(true)
+
+    const saved = await onSaveCatch(cleanedCatch)
+
+    setIsSaving(false)
+
+    if (!saved) {
+      setErrorMessage("That catch stayed on this device, but cloud saving failed.")
+      return
+    }
 
     setFormData({
       date: "",
@@ -97,8 +116,9 @@ function LogCatch({ onSaveCatch }) {
         </label>
 
         <button type="button" className="heroBtn fullWidth" onClick={saveCatch}>
-          Save Catch
+          {isSaving ? "Saving..." : "Save Catch"}
         </button>
+        {errorMessage && <p className="formMessage fullWidth">{errorMessage}</p>}
       </form>
     </div>
   )
@@ -149,47 +169,150 @@ function FlyTying() {
 
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
-  const [catches, setCatches] = useState([])
+  const [catches, setCatches] = useState(() => {
+    const saved = localStorage.getItem("hoodflylog-catches")
+    return saved ? JSON.parse(saved) : []
+  })
   const [viewMode, setViewMode] = useState("public")
+  const [loadStatus, setLoadStatus] = useState("Loading catch log...")
+  
+  useEffect(() => {
+    localStorage.setItem("hoodflylog-catches", JSON.stringify(catches))
+  }, [catches])
 
-if (viewMode === "public") {
-  return <LandingPage onEnterApp={() => setViewMode("app")} />
-}
+  useEffect(() => {
+    async function loadCatches() {
+      const { data, error } = await supabase
+        .from("catches")
+        .select("*")
+        .order("date", { ascending: false })
+
+      if (error) {
+        console.error(error)
+        setLoadStatus("Using catches saved on this device.")
+        return
+      }
+
+      setCatches(data || [])
+      setLoadStatus("")
+    }
+
+    loadCatches()
+  }, [])
+
+  const dashboardStats = useMemo(() => {
+    const total = catches.length
+    const biggest = catches.reduce((largest, fish) => {
+      const length = Number.parseFloat(String(fish.length || "").replace(/[^0-9.]/g, ""))
+      return Number.isFinite(length) && length > largest ? length : largest
+    }, 0)
+    const favoriteWater = mostCommon(catches, "location")
+    const topFly = mostCommon(catches, "fly")
+
+    return {
+      total,
+      favoriteWater: favoriteWater || "-",
+      biggest: biggest ? `${biggest}"` : "-",
+      topFly: topFly || "-",
+    }
+  }, [catches])
+
+  if (viewMode === "public") {
+    return <LandingPage onEnterApp={() => setViewMode("app")} />
+  }
+
   const navItems = [
     { id: "dashboard", label: "Home", icon: "🏠" },
-    { id: "log", label: "Log Catch", icon: "🎣" },
     { id: "history", label: "Journal", icon: "📖" },
+    { id: "log", label: "Log Catch", icon: "📸", primary: true },
     { id: "knots", label: "Knots", icon: "🪢" },
     { id: "flytying", label: "Fly Tying", icon: "🪰" },
   ]
 
- async function handleSaveCatch(newCatch) {
-  const { error } = await supabase
+async function handleSaveCatch(newCatch) {
+  const catchToSave = {
+    ...newCatch,
+  }
+
+  const fallbackCatch = {
+    id: crypto.randomUUID(),
+    ...catchToSave,
+  }
+
+  const { data, error } = await supabase
     .from("catches")
-    .insert([newCatch])
+    .insert([catchToSave])
+    .select()
+    .single()
 
   if (error) {
     console.error(error)
-    alert("Failed to save catch.")
+    setCatches((currentCatches) => [fallbackCatch, ...currentCatches])
+    setLoadStatus("Cloud save failed. This catch is saved on this device.")
+    setActivePage("history")
+    return true
+  }
+
+  setCatches((currentCatches) => [data || fallbackCatch, ...currentCatches])
+  setActivePage("history")
+  return true
+}
+
+function exportCatches() {
+  if (catches.length === 0) {
+    alert("No catches to export yet.")
     return
   }
 
-  setCatches([newCatch, ...catches])
-  setActivePage("history")
+  const fields = ["date", "time", "species", "length", "location", "fly", "setup", "water", "notes"]
+  const rows = catches.map((fish) =>
+    fields.map((field) => csvCell(fish[field] || "")).join(",")
+  )
+  const csv = [fields.join(","), ...rows].join("\n")
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `hoodflylog-catches-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
   return (
     <div className="app">
+      <aside className="sideNav">
+        <img src={logo} alt="HoodFlyLog" className="sideLogo" />
+        <div className="sideNavLinks">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              className={activePage === item.id ? "active" : ""}
+              onClick={() => setActivePage(item.id)}
+            >
+              <span>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="conditionsCard">
+          <strong>Today's Conditions</strong>
+          <p>Use GPS + Weather later to attach temperature, pressure, and water notes.</p>
+        </div>
+      </aside>
+
+      <div className="appMain">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Fly fishing journal</p>
-          <h1>HoodFlyLog</h1>
+          <h1>Dashboard 🎣</h1>
+          <p>Welcome back, Hood! Tight lines.</p>
         </div>
         <button
   className="primaryBtn"
   onClick={() => setViewMode("app")}
 >
-  Login / Dashboard
+  Jul 7, 2026
 </button>
       </header>
 
@@ -198,12 +321,12 @@ if (viewMode === "public") {
     <>
       <section className="heroCard">
         <div>
-          <p className="eyebrow">Today on the water</p>
-          <h2>Ready to log your next catch?</h2>
+          <p className="eyebrow">Mobile ready</p>
+          <h2>New Catch</h2>
           <p>
-            Track the water, fly, weather, photos, and notes from every trip.
+            Fast field notes for species, water, fly, setup, and the details you will want later.
           </p>
-          <button className="heroBtn">Log a Catch</button>
+          <button className="heroBtn" onClick={() => setActivePage("log")}>Log a Catch</button>
         </div>
       </section>
 
@@ -211,44 +334,57 @@ if (viewMode === "public") {
           <div className="statCard">
             <span>🎣</span>
             <p>Total Catches</p>
-            <h3>0</h3>
+            <h3>{dashboardStats.total}</h3>
           </div>
 
           <div className="statCard">
             <span>📍</span>
             <p>Favorite Water</p>
-            <h3>—</h3>
+            <h3>{dashboardStats.favoriteWater}</h3>
           </div>
 
           <div className="statCard">
             <span>🏆</span>
             <p>Biggest Fish</p>
-            <h3>0"</h3>
+            <h3>{dashboardStats.biggest}</h3>
           </div>
 
           <div className="statCard">
             <span>🪰</span>
             <p>Top Fly</p>
-            <h3>—</h3>
+            <h3>{dashboardStats.topFly}</h3>
           </div>
         </section>
 
         <section className="contentGrid">
           <div className="panel">
             <h2>Recent Catches</h2>
-            <div className="emptyState">
-              <span>🐟</span>
-              <h3>No catches logged yet</h3>
-              <p>Your latest catches will show up here once we connect the log form.</p>
-            </div>
+            {loadStatus && <p>{loadStatus}</p>}
+            {catches.length === 0 ? (
+              <div className="emptyState">
+                <span>🐟</span>
+                <h3>No catches logged yet</h3>
+                <p>Your latest catches will show up here after your first save.</p>
+              </div>
+            ) : (
+              <div className="catchList compact">
+                {catches.slice(0, 3).map((fish) => (
+                  <div className="catchCard" key={fish.id}>
+                    <h3>🎣 {fish.species || "Unknown Fish"}</h3>
+                    <p>📍 {fish.location || "No location"}</p>
+                    <p>🪰 {fish.fly || "No fly listed"}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="panel">
             <h2>Quick Tools</h2>
-            <button className="toolBtn">🪢 Open Knots Library</button>
-            <button className="toolBtn">🪰 Open Fly Tying Library</button>
+            <button className="toolBtn" onClick={() => setActivePage("knots")}>🪢 Open Knots Library</button>
+            <button className="toolBtn" onClick={() => setActivePage("flytying")}>🪰 Open Fly Tying Library</button>
             <button className="toolBtn">🗺️ View Fishing Map</button>
-            <button className="toolBtn">📤 Export Catch Log</button>
+            <button className="toolBtn" onClick={exportCatches}>📤 Export Catch Log</button>
           </div>
         </section>
               </>
@@ -272,8 +408,24 @@ if (viewMode === "public") {
           </button>
         ))}
       </nav>
+      </div>
     </div>
   )
 }
 
 export default App
+
+function mostCommon(items, field) {
+  const counts = items.reduce((acc, item) => {
+    const value = item[field]?.trim()
+    if (!value) return acc
+    acc[value] = (acc[value] || 0) + 1
+    return acc
+  }, {})
+
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]
+}
+
+function csvCell(value) {
+  return `"${String(value).replaceAll('"', '""')}"`
+}

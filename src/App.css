@@ -4,17 +4,77 @@
 
 body {
   margin: 0;
-  background: #07140d;
-  color: #f6f0df;
+  background: #efe3cb;
+  color: #061f14;
   font-family: Arial, sans-serif;
 }
 
 .app {
   min-height: 100vh;
-  padding-bottom: 82px;
+  display: grid;
+  grid-template-columns: 244px 1fr;
   background:
-    radial-gradient(circle at top right, rgba(148, 180, 116, 0.22), transparent 35%),
-    linear-gradient(180deg, #092015, #07140d);
+    linear-gradient(90deg, rgba(6, 31, 20, 0.98) 0 244px, transparent 244px),
+    linear-gradient(180deg, rgba(246, 239, 224, 0.82), rgba(239, 227, 203, 0.98)),
+    url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80");
+  background-size: auto, auto, cover;
+  background-position: center;
+}
+
+.appMain {
+  min-width: 0;
+}
+
+.sideNav {
+  min-height: 100vh;
+  padding: 14px;
+  color: #fff8ec;
+}
+
+.sideLogo {
+  width: 211px;
+  display: block;
+  margin: 0 auto 26px;
+}
+
+.sideNavLinks {
+  display: grid;
+  gap: 10px;
+}
+
+.sideNavLinks button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff8ec;
+  padding: 13px 14px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sideNavLinks button.active,
+.sideNavLinks button:hover {
+  background: rgba(201, 216, 166, 0.16);
+}
+
+.conditionsCard {
+  margin-top: 28px;
+  border: 1px solid rgba(201, 216, 166, 0.32);
+  border-radius: 10px;
+  padding: 14px;
+  background: rgba(201, 216, 166, 0.08);
+}
+
+.conditionsCard p {
+  margin: 12px 0 0;
+  color: #f6f0df;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .topbar {
@@ -22,13 +82,15 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 22px;
-  border-bottom: 1px solid rgba(244, 234, 216, 0.12);
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid rgba(95, 63, 32, 0.14);
+  background: rgba(246, 239, 224, 0.72);
+  backdrop-filter: blur(6px);
 }
 
 .eyebrow {
   margin: 0 0 4px;
-  color: #c9d8a6;
+  color: #78913e;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -41,65 +103,91 @@ h1, h2, h3, p {
 h1 {
   margin-bottom: 0;
   font-size: 2rem;
+  color: #061f14;
+}
+
+h2,
+h3 {
+  color: #061f14;
 }
 
 .dashboard {
-  width: min(1120px, 100%);
+  width: min(980px, 100%);
   margin: 0 auto;
-  padding: 20px;
+  padding: 18px 24px 110px;
 }
 
 .primaryBtn,
 .heroBtn {
-  border: 0;
-  border-radius: 999px;
-  background: #c9d8a6;
-  color: #07140d;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fff8ec;
+  color: #061f14;
   font-weight: 800;
   padding: 12px 16px;
   cursor: pointer;
 }
 
 .heroCard {
-  min-height: 260px;
+  min-height: 128px;
   display: flex;
-  align-items: end;
-  padding: 24px;
-  border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(7, 20, 13, 0.15), rgba(7, 20, 13, 0.85)),
-    url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80");
-  background-size: cover;
-  background-position: center;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px;
+  border-radius: 12px;
+  background: rgba(255, 248, 236, 0.92);
+  border: 1px solid #dfcda9;
+  box-shadow: 0 14px 38px rgba(58, 40, 19, 0.08);
+  color: #061f14;
 }
 
 .heroCard h2 {
-  font-size: clamp(2rem, 5vw, 4rem);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
   max-width: 720px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .heroCard p {
   max-width: 520px;
-  color: #f4ead8;
+  color: #4e4435;
   line-height: 1.5;
 }
 
 .quickGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 0;
   margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid #dfcda9;
+  border-radius: 12px;
+  background: rgba(255, 248, 236, 0.9);
 }
 
 .statCard,
 .panel {
-  background: rgba(255, 248, 236, 0.08);
-  border: 1px solid rgba(244, 234, 216, 0.12);
-  border-radius: 18px;
+  background: rgba(255, 248, 236, 0.92);
+  border: 1px solid #dfcda9;
+  border-radius: 12px;
   padding: 18px;
-  backdrop-filter: blur(8px);
+  color: #061f14;
+  box-shadow: 0 14px 38px rgba(58, 40, 19, 0.08);
+}
+
+.pageHeader h2 {
+  color: #061f14;
+}
+
+.statCard {
+  border: 0;
+  border-right: 1px solid #dfcda9;
+  border-radius: 0;
+  text-align: center;
+  box-shadow: none;
+}
+
+.statCard:last-child {
+  border-right: 0;
 }
 
 .statCard span {
@@ -107,12 +195,12 @@ h1 {
 }
 
 .statCard p {
-  color: #c9d8a6;
+  color: #3f3321;
   margin: 8px 0;
 }
 
 .statCard h3 {
-  font-size: 2rem;
+  font-size: 1.7rem;
   margin-bottom: 0;
 }
 
@@ -126,21 +214,46 @@ h1 {
 .emptyState {
   text-align: center;
   padding: 36px 12px;
-  color: #dccfb5;
+  color: #6d604c;
 }
 
 .emptyState span {
   font-size: 3rem;
 }
 
+.catchList {
+  display: grid;
+  gap: 12px;
+}
+
+.catchList.compact {
+  margin-top: 12px;
+}
+
+.catchCard {
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #f6ecd9;
+  padding: 14px;
+}
+
+.catchCard h3 {
+  margin-bottom: 10px;
+}
+
+.catchCard p {
+  margin-bottom: 6px;
+  color: #5d503e;
+}
+
 .toolBtn {
   width: 100%;
   text-align: left;
   margin-top: 10px;
-  border: 1px solid rgba(244, 234, 216, 0.12);
-  border-radius: 14px;
-  background: rgba(7, 20, 13, 0.55);
-  color: #f6f0df;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fbf4e8;
+  color: #061f14;
   padding: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -154,32 +267,61 @@ h1 {
   width: min(720px, calc(100% - 24px));
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-  padding: 8px;
-  background: rgba(6, 18, 12, 0.92);
-  border: 1px solid rgba(244, 234, 216, 0.18);
-  border-radius: 22px;
-  backdrop-filter: blur(16px);
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 
 .bottomNav button {
-  border: 0;
-  border-radius: 16px;
-  background: transparent;
-  color: #dccfb5;
-  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(244, 234, 216, 0.18);
+  border-radius: 18px;
+  background: rgba(6, 18, 12, 0.94);
+  color: #f8eedc;
+  min-height: 64px;
+  padding: 8px 6px;
   font-weight: 700;
+  line-height: 1.1;
   cursor: pointer;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
 .bottomNav button span {
   display: block;
   font-size: 1.2rem;
+  margin-bottom: 4px;
 }
 
 .bottomNav button.active {
+  background: #21452d;
+  color: #fff8ec;
+  border-color: rgba(201, 216, 166, 0.36);
+}
+
+.bottomNav button:nth-child(3) {
+  width: 96px;
+  height: 96px;
+  min-height: 96px;
+  justify-self: center;
+  margin-top: -34px;
+  border-radius: 999px;
   background: #c9d8a6;
   color: #07140d;
+  border: 4px solid rgba(6, 18, 12, 0.94);
+  padding: 10px 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  font-size: 0.78rem;
+  white-space: normal;
+}
+
+.bottomNav button:nth-child(3) span {
+  font-size: 2rem;
+  margin-bottom: 5px;
 }
 
 @media (max-width: 800px) {
@@ -193,6 +335,7 @@ h1 {
 
   .quickGrid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0;
   }
 
   .contentGrid {
@@ -205,9 +348,20 @@ h1 {
 
   .bottomNav {
     bottom: 8px;
+    gap: 7px;
   }
 
   .bottomNav button {
+    min-height: 58px;
+    border-radius: 15px;
+    font-size: 0.68rem;
+  }
+
+  .bottomNav button:nth-child(3) {
+    width: 86px;
+    height: 86px;
+    min-height: 86px;
+    margin-top: -28px;
     font-size: 0.72rem;
   }
 }
@@ -228,17 +382,17 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  color: #c9d8a6;
+  color: #4c493d;
   font-weight: 800;
 }
 
 .catchForm input,
 .catchForm textarea {
   width: 100%;
-  border: 1px solid rgba(244, 234, 216, 0.18);
-  border-radius: 14px;
-  background: rgba(7, 20, 13, 0.72);
-  color: #f6f0df;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #061f14;
   padding: 13px 14px;
   font: inherit;
 }
@@ -250,6 +404,28 @@ h1 {
 
 .fullWidth {
   grid-column: 1 / -1;
+}
+
+.formMessage {
+  margin: 0;
+  color: #8a5200;
+  font-weight: 700;
+}
+
+@media (max-width: 980px) {
+  .app {
+    display: block;
+    padding-bottom: 92px;
+    background:
+      linear-gradient(180deg, rgba(246, 239, 224, 0.9), rgba(239, 227, 203, 0.98)),
+      url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80");
+    background-size: cover;
+    background-position: center;
+  }
+
+  .sideNav {
+    display: none;
+  }
 }
 
 @media (max-width: 700px) {
