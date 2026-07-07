@@ -531,11 +531,6 @@ function handlePhotoSelected(event) {
 }
 
 function handleNavClick(item) {
-  if (item.id === "log") {
-    openCamera()
-    return
-  }
-
   setActivePage(item.id)
 }
 
@@ -585,7 +580,7 @@ function handleNavClick(item) {
           <p>
             Fast field notes for species, water, fly, setup, and the details you will want later.
           </p>
-          <button className="heroBtn" onClick={openCamera}>Log a Catch</button>
+          <button className="heroBtn" onClick={() => setActivePage("log")}>Log a Catch</button>
         </div>
       </section>
 

@@ -151,7 +151,8 @@ h3 {
   min-height: 128px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  text-align: center;
   padding: 18px;
   border-radius: 12px;
   background: rgba(255, 248, 236, 0.92);
@@ -160,14 +161,19 @@ h3 {
   color: #061f14;
 }
 
+.heroCard > div {
+  width: min(620px, 100%);
+}
+
 .heroCard h2 {
   font-size: clamp(1.6rem, 3vw, 2.2rem);
-  max-width: 720px;
   margin-bottom: 8px;
 }
 
 .heroCard p {
   max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
   color: #4e4435;
   line-height: 1.5;
 }
