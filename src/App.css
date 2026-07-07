@@ -118,7 +118,9 @@ h3 {
 }
 
 .primaryBtn,
-.heroBtn {
+.heroBtn,
+.secondaryBtn,
+.cameraBtn {
   border: 1px solid #dfcda9;
   border-radius: 10px;
   background: #fff8ec;
@@ -126,6 +128,23 @@ h3 {
   font-weight: 800;
   padding: 12px 16px;
   cursor: pointer;
+}
+
+.heroBtn {
+  background: #185734;
+  border-color: #185734;
+  color: #fff8ec;
+}
+
+.secondaryBtn {
+  background: #fffaf0;
+  color: #061f14;
+}
+
+.cameraBtn {
+  background: #c9d8a6;
+  border-color: #b7ca91;
+  color: #061f14;
 }
 
 .heroCard {
@@ -235,6 +254,16 @@ h3 {
   border-radius: 10px;
   background: #f6ecd9;
   padding: 14px;
+}
+
+.catchPhoto {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: #fffaf0;
 }
 
 .catchCard h3 {
@@ -376,6 +405,45 @@ h3 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
+}
+
+.photoCapture {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed #c9b98f;
+  border-radius: 12px;
+  background: #fffaf0;
+}
+
+.photoCapture p {
+  margin: 0;
+  color: #665b48;
+}
+
+.photoPreview {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+  gap: 12px;
+  color: #4c493d;
+  font-weight: 700;
+}
+
+.photoPreview img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid #dfcda9;
+}
+
+.cameraInput {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .catchForm label {

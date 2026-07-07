@@ -1,22 +1,13 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { supabase } from "./supabase"
 import LandingPage from "./components/LandingPage"
 import logo from "./assets/hoodflylog-logo.jpg"
 import "./App.css"
-function LogCatch({ onSaveCatch }) {
-  const [formData, setFormData] = useState({
-    date: "",
-    time: "",
-    species: "",
-    length: "",
-    location: "",
-    fly: "",
-    setup: "",
-    water: "",
-    notes: "",
-  })
+function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera }) {
+  const [formData, setFormData] = useState(() => createBlankCatchForm())
   const [errorMessage, setErrorMessage] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [weatherStatus, setWeatherStatus] = useState("")
 
   function updateField(field, value) {
     setFormData({
@@ -29,6 +20,11 @@ function LogCatch({ onSaveCatch }) {
     const cleanedCatch = Object.fromEntries(
       Object.entries(formData).map(([key, value]) => [key, value.trim()])
     )
+
+    if (selectedPhoto?.name) {
+      const photoNote = `Photo captured: ${selectedPhoto.name}`
+      cleanedCatch.notes = cleanedCatch.notes ? `${cleanedCatch.notes}\n\n${photoNote}` : photoNote
+    }
 
     if (!cleanedCatch.species && !cleanedCatch.location && !cleanedCatch.fly && !cleanedCatch.notes) {
       setErrorMessage("Add at least a species, location, fly, or note before saving.")
@@ -47,17 +43,45 @@ function LogCatch({ onSaveCatch }) {
       return
     }
 
-    setFormData({
-      date: "",
-      time: "",
-      species: "",
-      length: "",
-      location: "",
-      fly: "",
-      setup: "",
-      water: "",
-      notes: "",
-    })
+    setFormData(createBlankCatchForm())
+  }
+
+  async function useGpsWeather() {
+    if (!navigator.geolocation) {
+      setWeatherStatus("GPS is not available in this browser.")
+      return
+    }
+
+    setWeatherStatus("Getting GPS and weather...")
+
+    try {
+      const position = await getCurrentPosition()
+      const latitude = position.coords.latitude.toFixed(5)
+      const longitude = position.coords.longitude.toFixed(5)
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,pressure_msl&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`
+      const response = await fetch(weatherUrl)
+
+      if (!response.ok) {
+        throw new Error("Weather request failed")
+      }
+
+      const weather = await response.json()
+      const current = weather.current || {}
+      const weatherNote = [
+        `GPS: ${latitude}, ${longitude}`,
+        `Weather: ${current.temperature_2m ?? "?"}F, wind ${current.wind_speed_10m ?? "?"} mph, humidity ${current.relative_humidity_2m ?? "?"}%, pressure ${current.pressure_msl ?? "?"} hPa`,
+      ].join("\n")
+
+      setFormData((currentForm) => ({
+        ...currentForm,
+        location: currentForm.location || `${latitude}, ${longitude}`,
+        notes: currentForm.notes ? `${currentForm.notes}\n\n${weatherNote}` : weatherNote,
+      }))
+      setWeatherStatus("GPS and weather added.")
+    } catch (error) {
+      console.error(error)
+      setWeatherStatus("Could not load GPS/weather. Check location permission and signal.")
+    }
   }
 
   return (
@@ -70,6 +94,20 @@ function LogCatch({ onSaveCatch }) {
       </div>
 
       <form className="catchForm">
+        <div className="photoCapture fullWidth">
+          <button type="button" className="cameraBtn" onClick={onOpenCamera}>
+            📸 Add Catch Photo
+          </button>
+          {selectedPhoto ? (
+            <div className="photoPreview">
+              <img src={selectedPhoto.previewUrl} alt="Catch preview" />
+              <span>{selectedPhoto.name}</span>
+            </div>
+          ) : (
+            <p>Tap the camera button to take or choose a catch photo.</p>
+          )}
+        </div>
+
         <label>
           Date
           <input type="date" value={formData.date} onChange={(e) => updateField("date", e.target.value)} />
@@ -115,6 +153,11 @@ function LogCatch({ onSaveCatch }) {
           <textarea placeholder="What worked, where fish were holding, weather, retrieve speed..." value={formData.notes} onChange={(e) => updateField("notes", e.target.value)} />
         </label>
 
+        <button type="button" className="secondaryBtn fullWidth" onClick={useGpsWeather}>
+          Use GPS + Weather
+        </button>
+        {weatherStatus && <p className="formMessage fullWidth">{weatherStatus}</p>}
+
         <button type="button" className="heroBtn fullWidth" onClick={saveCatch}>
           {isSaving ? "Saving..." : "Save Catch"}
         </button>
@@ -135,6 +178,7 @@ function Journal({ catches }) {
         <div className="catchList">
           {catches.map((fish) => (
             <div className="catchCard" key={fish.id}>
+              {fish.photo_url && <img src={fish.photo_url} alt={fish.species || "Saved catch"} className="catchPhoto" />}
               <h3>🎣 {fish.species || "Unknown Fish"}</h3>
               <p>📍 {fish.location || "No location"}</p>
               <p>📏 {fish.length || "No length"}</p>
@@ -169,12 +213,14 @@ function FlyTying() {
 
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
+  const cameraInputRef = useRef(null)
   const [catches, setCatches] = useState(() => {
     const saved = localStorage.getItem("hoodflylog-catches")
     return saved ? JSON.parse(saved) : []
   })
   const [viewMode, setViewMode] = useState("public")
   const [loadStatus, setLoadStatus] = useState("Loading catch log...")
+  const [selectedPhoto, setSelectedPhoto] = useState(null)
   
   useEffect(() => {
     localStorage.setItem("hoodflylog-catches", JSON.stringify(catches))
@@ -199,6 +245,14 @@ function App() {
 
     loadCatches()
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (selectedPhoto?.previewUrl) {
+        URL.revokeObjectURL(selectedPhoto.previewUrl)
+      }
+    }
+  }, [selectedPhoto])
 
   const dashboardStats = useMemo(() => {
     const total = catches.length
@@ -230,8 +284,14 @@ function App() {
   ]
 
 async function handleSaveCatch(newCatch) {
+  const { photoUploadNote, ...photoDetails } = await uploadSelectedPhoto()
   const catchToSave = {
     ...newCatch,
+    ...photoDetails,
+  }
+
+  if (photoUploadNote) {
+    catchToSave.notes = catchToSave.notes ? `${catchToSave.notes}\n\n${photoUploadNote}` : photoUploadNote
   }
 
   const fallbackCatch = {
@@ -249,13 +309,55 @@ async function handleSaveCatch(newCatch) {
     console.error(error)
     setCatches((currentCatches) => [fallbackCatch, ...currentCatches])
     setLoadStatus("Cloud save failed. This catch is saved on this device.")
+    clearSelectedPhoto()
     setActivePage("history")
     return true
   }
 
   setCatches((currentCatches) => [data || fallbackCatch, ...currentCatches])
+  clearSelectedPhoto()
   setActivePage("history")
   return true
+}
+
+async function uploadSelectedPhoto() {
+  if (!selectedPhoto?.file) {
+    return {}
+  }
+
+  const filePath = createCatchPhotoPath(selectedPhoto.file)
+  const { error } = await supabase.storage
+    .from("catch-photos")
+    .upload(filePath, selectedPhoto.file, {
+      cacheControl: "3600",
+      upsert: false,
+    })
+
+  if (error) {
+    console.error(error)
+    return {
+      photoUploadNote: `Photo upload failed: ${selectedPhoto.name}`,
+    }
+  }
+
+  const { data } = supabase.storage
+    .from("catch-photos")
+    .getPublicUrl(filePath)
+
+  return {
+    photo_path: filePath,
+    photo_url: data.publicUrl,
+  }
+}
+
+function clearSelectedPhoto() {
+  setSelectedPhoto((currentPhoto) => {
+    if (currentPhoto?.previewUrl) {
+      URL.revokeObjectURL(currentPhoto.previewUrl)
+    }
+
+    return null
+  })
 }
 
 function exportCatches() {
@@ -280,6 +382,42 @@ function exportCatches() {
   URL.revokeObjectURL(url)
 }
 
+function openCamera() {
+  setActivePage("log")
+  window.setTimeout(() => {
+    cameraInputRef.current?.click()
+  }, 100)
+}
+
+function handlePhotoSelected(event) {
+  const file = event.target.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  setSelectedPhoto((currentPhoto) => {
+    if (currentPhoto?.previewUrl) {
+      URL.revokeObjectURL(currentPhoto.previewUrl)
+    }
+
+    return {
+      file,
+      name: file.name,
+      previewUrl: URL.createObjectURL(file),
+    }
+  })
+}
+
+function handleNavClick(item) {
+  if (item.id === "log") {
+    openCamera()
+    return
+  }
+
+  setActivePage(item.id)
+}
+
   return (
     <div className="app">
       <aside className="sideNav">
@@ -289,7 +427,7 @@ function exportCatches() {
             <button
               key={item.id}
               className={activePage === item.id ? "active" : ""}
-              onClick={() => setActivePage(item.id)}
+              onClick={() => handleNavClick(item)}
             >
               <span>{item.icon}</span>
               {item.label}
@@ -326,7 +464,7 @@ function exportCatches() {
           <p>
             Fast field notes for species, water, fly, setup, and the details you will want later.
           </p>
-          <button className="heroBtn" onClick={() => setActivePage("log")}>Log a Catch</button>
+          <button className="heroBtn" onClick={openCamera}>Log a Catch</button>
         </div>
       </section>
 
@@ -370,6 +508,7 @@ function exportCatches() {
               <div className="catchList compact">
                 {catches.slice(0, 3).map((fish) => (
                   <div className="catchCard" key={fish.id}>
+                    {fish.photo_url && <img src={fish.photo_url} alt={fish.species || "Recent catch"} className="catchPhoto" />}
                     <h3>🎣 {fish.species || "Unknown Fish"}</h3>
                     <p>📍 {fish.location || "No location"}</p>
                     <p>🪰 {fish.fly || "No fly listed"}</p>
@@ -390,7 +529,7 @@ function exportCatches() {
               </>
     )}
 
-   {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} />}
+   {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} selectedPhoto={selectedPhoto} onOpenCamera={openCamera} />}
 {activePage === "history" && <Journal catches={catches} />}
     {activePage === "knots" && <Knots />}
     {activePage === "flytying" && <FlyTying />}
@@ -401,13 +540,21 @@ function exportCatches() {
           <button
             key={item.id}
             className={activePage === item.id ? "active" : ""}
-            onClick={() => setActivePage(item.id)}
+            onClick={() => handleNavClick(item)}
           >
             <span>{item.icon}</span>
             {item.label}
           </button>
         ))}
       </nav>
+      <input
+        ref={cameraInputRef}
+        className="cameraInput"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handlePhotoSelected}
+      />
       </div>
     </div>
   )
@@ -428,4 +575,42 @@ function mostCommon(items, field) {
 
 function csvCell(value) {
   return `"${String(value).replaceAll('"', '""')}"`
+}
+
+function createCatchPhotoPath(file) {
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg"
+  const safeName = file.name
+    .replace(/\.[^/.]+$/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 40) || "catch"
+
+  return `public/${Date.now()}-${crypto.randomUUID()}-${safeName}.${extension}`
+}
+
+function getCurrentPosition() {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 60000,
+    })
+  })
+}
+
+function createBlankCatchForm() {
+  const now = new Date()
+
+  return {
+    date: now.toISOString().slice(0, 10),
+    time: now.toTimeString().slice(0, 5),
+    species: "",
+    length: "",
+    location: "",
+    fly: "",
+    setup: "",
+    water: "",
+    notes: "",
+  }
 }
