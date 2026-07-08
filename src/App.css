@@ -453,6 +453,107 @@ h3 {
   cursor: pointer;
 }
 
+.leaderboardPanel {
+  display: grid;
+  gap: 16px;
+}
+
+.leaderboardFilters {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 12px;
+}
+
+.leaderboardFilters label,
+.leaderboardFilters div {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fbf4e8;
+  padding: 12px;
+  color: #4c493d;
+  font-weight: 800;
+}
+
+.leaderboardFilters select {
+  width: 100%;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #061f14;
+  padding: 12px;
+  font: inherit;
+}
+
+.leaderboardFilters span {
+  color: #6d604c;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.appLeaderboardList {
+  display: grid;
+  gap: 12px;
+}
+
+.appLeaderboardCard {
+  display: grid;
+  grid-template-columns: 48px 96px 1fr;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #dfcda9;
+  border-radius: 12px;
+  background: #f6ecd9;
+  padding: 12px;
+}
+
+.appLeaderboardCard img {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fffaf0;
+}
+
+.leaderboardThumb {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 72px;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fffaf0;
+  font-size: 1.8rem;
+}
+
+.leaderboardRank {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: #c9d8a6;
+  color: #061f14;
+  font-weight: 900;
+}
+
+.appLeaderboardCard h3 {
+  margin-bottom: 6px;
+}
+
+.appLeaderboardCard p {
+  margin-bottom: 4px;
+  color: #5d503e;
+}
+
+.appLeaderboardCard small {
+  color: #6d604c;
+  font-weight: 800;
+}
+
 .libraryGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -576,6 +677,22 @@ h3 {
 
   .heroCard {
     min-height: 340px;
+  }
+
+  .leaderboardFilters {
+    grid-template-columns: 1fr;
+  }
+
+  .appLeaderboardCard {
+    grid-template-columns: 40px 82px 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .appLeaderboardCard img,
+  .leaderboardThumb {
+    width: 82px;
+    height: 66px;
   }
 
   .bottomNav {

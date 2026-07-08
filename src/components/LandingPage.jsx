@@ -132,7 +132,11 @@ function LandingPage({ catches = [], onEnterApp }) {
             <div className="leaderboardRow" key={row.label}>
               <span>{["🥇", "🥈", "🥉"][index]}</span>
               <strong>{row.label}</strong>
-              <p>{row.value}</p>
+              <div>
+                <p>{row.value}</p>
+                {row.details && <small>{row.details}</small>}
+                {row.angler && <small>by {row.angler}</small>}
+              </div>
             </div>
           ))}
         </div>
@@ -176,14 +180,20 @@ function buildLeaderboard(catches) {
     {
       label: "Biggest Fish",
       value: biggestFish.fish ? `${biggestFish.fish.species || "Unknown Fish"} - ${biggestFish.length}"` : "Waiting on a measured catch",
+      details: biggestFish.fish ? catchContext(biggestFish.fish) : "",
+      angler: biggestFish.fish ? anglerNameForCatch(biggestFish.fish) : "",
     },
     {
       label: "Top Water",
       value: topWater || "Popular waters will show here",
+      details: topWater ? topWaterContext(catches, topWater) : "",
+      angler: topWater ? topAnglerFor(catches, "location", topWater) : "",
     },
     {
       label: "Most Productive Fly",
       value: topFly || "Top flies will show here",
+      details: topFly ? topFlyContext(catches, topFly) : "",
+      angler: topFly ? topAnglerFor(catches, "fly", topFly) : "",
     },
   ]
 }
@@ -197,4 +207,36 @@ function mostCommon(items, field) {
   }, {})
 
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]
+}
+
+function topAnglerFor(items, field, value) {
+  const match = items.find((item) => item[field]?.trim() === value)
+  return match ? anglerNameForCatch(match) : ""
+}
+
+function anglerNameForCatch(fish) {
+  return fish.angler_name || fish.display_name || fish.profile_name || shortAnglerId(fish.user_id) || "HoodFly angler"
+}
+
+function catchContext(fish) {
+  return [
+    fish.location ? `Water: ${fish.location}` : "",
+    fish.fly ? `Fly: ${fish.fly}` : "",
+  ].filter(Boolean).join(" · ")
+}
+
+function topWaterContext(catches, water) {
+  const waterCatches = catches.filter((fish) => fish.location?.trim() === water)
+  const topFly = mostCommon(waterCatches, "fly")
+  return topFly ? `Top fly here: ${topFly}` : "Fly details will show as anglers log them"
+}
+
+function topFlyContext(catches, fly) {
+  const flyCatches = catches.filter((fish) => fish.fly?.trim() === fly)
+  const water = mostCommon(flyCatches, "location")
+  return water ? `Most used at ${water}` : "Waterbody details will show as anglers log them"
+}
+
+function shortAnglerId(userId = "") {
+  return userId ? `Angler ${String(userId).slice(0, 4)}` : ""
 }

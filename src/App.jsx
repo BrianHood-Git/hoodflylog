@@ -206,6 +206,87 @@ function Journal({ catches, onChooseCatchPhoto, uploadingCatchId }) {
   )
 }
 
+function Leaderboard({ catches, onLogCatch }) {
+  const waters = useMemo(() => {
+    return [...new Set(catches.map((fish) => fish.location?.trim()).filter(Boolean))].sort()
+  }, [catches])
+  const [selectedWater, setSelectedWater] = useState("all")
+  const filteredCatches = selectedWater === "all"
+    ? catches
+    : catches.filter((fish) => fish.location?.trim() === selectedWater)
+  const rankedCatches = [...filteredCatches]
+    .map((fish) => ({
+      ...fish,
+      measuredLength: parseCatchLength(fish.length),
+    }))
+    .sort((a, b) => {
+      if (b.measuredLength !== a.measuredLength) return b.measuredLength - a.measuredLength
+      return new Date(b.created_at || b.date || 0) - new Date(a.created_at || a.date || 0)
+    })
+    .slice(0, 10)
+  const topFly = mostCommon(filteredCatches, "fly")
+  const topWater = mostCommon(filteredCatches, "location")
+
+  return (
+    <div className="panel leaderboardPanel">
+      <div className="pageHeader">
+        <div>
+          <p className="eyebrow">Top catches</p>
+          <h2>🏆 Leaderboard</h2>
+        </div>
+        <button className="heroBtn" onClick={onLogCatch} type="button">Log a Catch</button>
+      </div>
+
+      <div className="leaderboardFilters">
+        <label>
+          Waterbody
+          <select value={selectedWater} onChange={(event) => setSelectedWater(event.target.value)}>
+            <option value="all">All waters</option>
+            {waters.map((water) => (
+              <option key={water} value={water}>{water}</option>
+            ))}
+          </select>
+        </label>
+        <div>
+          <span>Top water</span>
+          <strong>{topWater || "No water logged yet"}</strong>
+        </div>
+        <div>
+          <span>Top fly</span>
+          <strong>{topFly || "No fly logged yet"}</strong>
+        </div>
+      </div>
+
+      {rankedCatches.length === 0 ? (
+        <div className="emptyState">
+          <span>🏆</span>
+          <h3>No leaderboard catches yet</h3>
+          <p>Log a catch with species, water, length, and fly to start ranking trips.</p>
+        </div>
+      ) : (
+        <div className="appLeaderboardList">
+          {rankedCatches.map((fish, index) => (
+            <article className="appLeaderboardCard" key={fish.id}>
+              <div className="leaderboardRank">{index + 1}</div>
+              {fish.photo_url ? (
+                <img src={fish.photo_url} alt={fish.species || "Leaderboard catch"} />
+              ) : (
+                <div className="leaderboardThumb">🎣</div>
+              )}
+              <div>
+                <h3>{fish.species || "Unknown Fish"}</h3>
+                <p>{fish.measuredLength ? `${fish.measuredLength}"` : "No length"} · {fish.location || "No waterbody"}</p>
+                <p>{fish.fly ? `Fly: ${fish.fly}` : "No fly listed"}</p>
+                <small>by {fish.angler_name || shortAnglerId(fish.user_id) || "HoodFly angler"}</small>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Knots() {
   const knots = [
     {
@@ -606,12 +687,13 @@ function App() {
         return
       }
 
-      setCatches(data || [])
+      const catchesWithAnglers = await attachAnglerNames(data || [], profile)
+      setCatches(catchesWithAnglers)
       setLoadStatus("")
     }
 
     loadCatches()
-  }, [user])
+  }, [user, profile])
 
   useEffect(() => {
     return () => {
@@ -665,6 +747,7 @@ function App() {
   ]
   const sidebarItems = [
     ...navItems,
+    { id: "leaderboard", label: "Leaderboard", icon: "🏆" },
     { id: "profile", label: "Profile", icon: "👤" },
   ]
   const displayName = profile?.display_name || user.email?.split("@")[0] || "angler"
@@ -1004,6 +1087,7 @@ async function saveProfile(formData) {
 
           <div className="panel">
             <h2>Quick Tools</h2>
+            <button className="toolBtn" onClick={() => setActivePage("leaderboard")}>🏆 View Leaderboard</button>
             <button className="toolBtn" onClick={() => setActivePage("knots")}>🪢 Open Knots Library</button>
             <button className="toolBtn" onClick={() => setActivePage("flytying")}>🪰 Open Fly Tying Library</button>
             <button className="toolBtn">🗺️ View Fishing Map</button>
@@ -1015,6 +1099,7 @@ async function saveProfile(formData) {
 
    {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} selectedPhoto={selectedPhoto} onOpenCamera={openCamera} onChoosePhoto={openGallery} />}
 {activePage === "history" && <Journal catches={catches} onChooseCatchPhoto={openSavedCatchPhotoPicker} uploadingCatchId={uploadingCatchId} />}
+    {activePage === "leaderboard" && <Leaderboard catches={catches} onLogCatch={() => setActivePage("log")} />}
     {activePage === "knots" && <Knots />}
     {activePage === "flytying" && <FlyTying />}
     {activePage === "profile" && <Profile key={profile?.updated_at || user.id} profile={profile} user={user} onSaveProfile={saveProfile} />}
@@ -1076,6 +1161,15 @@ function csvCell(value) {
   return `"${String(value).replaceAll('"', '""')}"`
 }
 
+function parseCatchLength(value) {
+  const length = Number.parseFloat(String(value || "").replace(/[^0-9.]/g, ""))
+  return Number.isFinite(length) ? length : 0
+}
+
+function shortAnglerId(userId = "") {
+  return userId ? `Angler ${String(userId).slice(0, 4)}` : ""
+}
+
 function getInitials(value = "") {
   const parts = value
     .replace(/@.*/, "")
@@ -1086,6 +1180,38 @@ function getInitials(value = "") {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "HF"
+}
+
+async function attachAnglerNames(catches, currentProfile) {
+  const userIds = [...new Set(catches.map((fish) => fish.user_id).filter(Boolean))]
+
+  if (userIds.length === 0) {
+    return catches
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .in("id", userIds)
+
+  const profileNames = new Map()
+
+  if (!error) {
+    data?.forEach((profile) => {
+      if (profile.display_name) {
+        profileNames.set(profile.id, profile.display_name)
+      }
+    })
+  }
+
+  if (currentProfile?.id && currentProfile.display_name) {
+    profileNames.set(currentProfile.id, currentProfile.display_name)
+  }
+
+  return catches.map((fish) => ({
+    ...fish,
+    angler_name: profileNames.get(fish.user_id) || fish.angler_name,
+  }))
 }
 
 function createCatchPhotoPath(file, userId) {
