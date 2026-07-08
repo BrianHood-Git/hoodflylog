@@ -287,7 +287,14 @@ function Leaderboard({ catches, onLogCatch }) {
   )
 }
 
-function Knots() {
+function Knots({ customKnots, onAddCustomKnot, onRemoveCustomKnot }) {
+  const [formData, setFormData] = useState({
+    name: "",
+    use: "",
+    notes: "",
+    steps: "",
+  })
+  const [message, setMessage] = useState("")
   const knots = [
     {
       name: "Improved Clinch Knot",
@@ -326,21 +333,84 @@ function Knots() {
       steps: ["Lay tube along fly line", "Wrap leader around tube and fly line", "Pass tag through tube", "Remove tube", "Wet and tighten"],
     },
   ]
+  const knotLibrary = [...knots, ...customKnots]
+
+  function updateField(field, value) {
+    setFormData({
+      ...formData,
+      [field]: value,
+    })
+  }
+
+  function addKnot(event) {
+    event.preventDefault()
+
+    if (!formData.name.trim()) {
+      setMessage("Add a knot name before saving.")
+      return
+    }
+
+    onAddCustomKnot({
+      id: crypto.randomUUID(),
+      name: formData.name.trim(),
+      use: formData.use.trim() || "Custom knot",
+      notes: formData.notes.trim() || "Personal knot note.",
+      steps: splitListInput(formData.steps),
+      custom: true,
+    })
+
+    setFormData({ name: "", use: "", notes: "", steps: "" })
+    setMessage("Custom knot added.")
+  }
 
   return (
     <div className="panel">
       <h2>🪢 Knots Library</h2>
+      <form className="libraryForm" onSubmit={addKnot}>
+        <div className="sectionHeader compactHeader">
+          <div>
+            <p className="eyebrow">Your knots</p>
+            <h3>Add a Custom Knot</h3>
+          </div>
+          <button className="heroBtn" type="submit">Save Knot</button>
+        </div>
+        <div className="libraryFormGrid">
+          <label>
+            Knot name
+            <input type="text" placeholder="Double Davy" value={formData.name} onChange={(event) => updateField("name", event.target.value)} />
+          </label>
+          <label>
+            Use
+            <input type="text" placeholder="Fly to tippet" value={formData.use} onChange={(event) => updateField("use", event.target.value)} />
+          </label>
+          <label className="fullWidth">
+            Notes
+            <textarea placeholder="When you like to use it, strengths, reminders..." value={formData.notes} onChange={(event) => updateField("notes", event.target.value)} />
+          </label>
+          <label className="fullWidth">
+            Steps
+            <textarea placeholder="One step per line" value={formData.steps} onChange={(event) => updateField("steps", event.target.value)} />
+          </label>
+        </div>
+        {message && <p className="formMessage">{message}</p>}
+      </form>
       <div className="libraryGrid">
-        {knots.map((knot) => (
-          <article className="libraryCard" key={knot.name}>
+        {knotLibrary.map((knot) => (
+          <article className="libraryCard" key={knot.id || knot.name}>
             <p className="eyebrow">{knot.use}</p>
             <h3>{knot.name}</h3>
+            {knot.custom && <span className="customBadge">Custom</span>}
             <p>{knot.notes}</p>
-            <ol>
-              {knot.steps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
+            {knot.steps.length > 0 && (
+              <ol>
+                {knot.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            )}
+            {knot.custom && (
+              <button className="textBtn" type="button" onClick={() => onRemoveCustomKnot(knot.id)}>Remove</button>
+            )}
           </article>
         ))}
       </div>
@@ -348,7 +418,15 @@ function Knots() {
   )
 }
 
-function FlyTying() {
+function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
+  const [formData, setFormData] = useState({
+    name: "",
+    type: "",
+    bestFor: "",
+    materials: "",
+    tip: "",
+  })
+  const [message, setMessage] = useState("")
   const flies = [
     {
       name: "Woolly Bugger",
@@ -407,18 +485,84 @@ function FlyTying() {
       tip: "Let the rings settle after it lands, then twitch once. Panfish usually tell on themselves.",
     },
   ]
+  const flyLibrary = [...flies, ...customFlies]
+
+  function updateField(field, value) {
+    setFormData({
+      ...formData,
+      [field]: value,
+    })
+  }
+
+  function addFly(event) {
+    event.preventDefault()
+
+    if (!formData.name.trim()) {
+      setMessage("Add a fly name before saving.")
+      return
+    }
+
+    onAddCustomFly({
+      id: crypto.randomUUID(),
+      name: formData.name.trim(),
+      type: formData.type.trim() || "Custom fly",
+      bestFor: formData.bestFor.trim() || "Your waters",
+      materials: formData.materials.trim() || "Materials not listed yet.",
+      tip: formData.tip.trim() || "Personal tying or fishing note.",
+      custom: true,
+    })
+
+    setFormData({ name: "", type: "", bestFor: "", materials: "", tip: "" })
+    setMessage("Custom fly added.")
+  }
 
   return (
     <div className="panel">
       <h2>🪰 Fly Tying Library</h2>
+      <form className="libraryForm" onSubmit={addFly}>
+        <div className="sectionHeader compactHeader">
+          <div>
+            <p className="eyebrow">Your patterns</p>
+            <h3>Add a Custom Fly</h3>
+          </div>
+          <button className="heroBtn" type="submit">Save Fly</button>
+        </div>
+        <div className="libraryFormGrid">
+          <label>
+            Fly name
+            <input type="text" placeholder="Crescent Bend Bugger" value={formData.name} onChange={(event) => updateField("name", event.target.value)} />
+          </label>
+          <label>
+            Type
+            <input type="text" placeholder="Streamer, dry, nymph..." value={formData.type} onChange={(event) => updateField("type", event.target.value)} />
+          </label>
+          <label>
+            Best for
+            <input type="text" placeholder="Bass, panfish, trout..." value={formData.bestFor} onChange={(event) => updateField("bestFor", event.target.value)} />
+          </label>
+          <label>
+            Materials
+            <input type="text" placeholder="Hook, thread, body, tail..." value={formData.materials} onChange={(event) => updateField("materials", event.target.value)} />
+          </label>
+          <label className="fullWidth">
+            Tip
+            <textarea placeholder="Tying notes, colors, retrieve, where it works..." value={formData.tip} onChange={(event) => updateField("tip", event.target.value)} />
+          </label>
+        </div>
+        {message && <p className="formMessage">{message}</p>}
+      </form>
       <div className="libraryGrid">
-        {flies.map((fly) => (
-          <article className="libraryCard" key={fly.name}>
+        {flyLibrary.map((fly) => (
+          <article className="libraryCard" key={fly.id || fly.name}>
             <p className="eyebrow">{fly.type}</p>
             <h3>{fly.name}</h3>
+            {fly.custom && <span className="customBadge">Custom</span>}
             <p><strong>Best for:</strong> {fly.bestFor}</p>
             <p><strong>Materials:</strong> {fly.materials}</p>
             <p>{fly.tip}</p>
+            {fly.custom && (
+              <button className="textBtn" type="button" onClick={() => onRemoveCustomFly(fly.id)}>Remove</button>
+            )}
           </article>
         ))}
       </div>
@@ -601,6 +745,8 @@ function App() {
   const [profile, setProfile] = useState(null)
   const [photoTargetCatch, setPhotoTargetCatch] = useState(null)
   const [uploadingCatchId, setUploadingCatchId] = useState("")
+  const [customKnots, setCustomKnots] = useState(() => readStoredList("hoodflylog-custom-knots"))
+  const [customFlies, setCustomFlies] = useState(() => readStoredList("hoodflylog-custom-flies"))
   const user = session?.user
   
   useEffect(() => {
@@ -610,6 +756,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem("hoodflylog-view-mode", viewMode)
   }, [viewMode])
+
+  useEffect(() => {
+    localStorage.setItem("hoodflylog-custom-knots", JSON.stringify(customKnots))
+  }, [customKnots])
+
+  useEffect(() => {
+    localStorage.setItem("hoodflylog-custom-flies", JSON.stringify(customFlies))
+  }, [customFlies])
 
   useEffect(() => {
     async function loadSession() {
@@ -947,6 +1101,22 @@ function handleNavClick(item) {
   setActivePage(item.id)
 }
 
+function addCustomKnot(knot) {
+  setCustomKnots((currentKnots) => [knot, ...currentKnots])
+}
+
+function removeCustomKnot(knotId) {
+  setCustomKnots((currentKnots) => currentKnots.filter((knot) => knot.id !== knotId))
+}
+
+function addCustomFly(fly) {
+  setCustomFlies((currentFlies) => [fly, ...currentFlies])
+}
+
+function removeCustomFly(flyId) {
+  setCustomFlies((currentFlies) => currentFlies.filter((fly) => fly.id !== flyId))
+}
+
 async function signOut() {
   await supabase.auth.signOut()
   setCatches([])
@@ -1100,8 +1270,8 @@ async function saveProfile(formData) {
    {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} selectedPhoto={selectedPhoto} onOpenCamera={openCamera} onChoosePhoto={openGallery} />}
 {activePage === "history" && <Journal catches={catches} onChooseCatchPhoto={openSavedCatchPhotoPicker} uploadingCatchId={uploadingCatchId} />}
     {activePage === "leaderboard" && <Leaderboard catches={catches} onLogCatch={() => setActivePage("log")} />}
-    {activePage === "knots" && <Knots />}
-    {activePage === "flytying" && <FlyTying />}
+    {activePage === "knots" && <Knots customKnots={customKnots} onAddCustomKnot={addCustomKnot} onRemoveCustomKnot={removeCustomKnot} />}
+    {activePage === "flytying" && <FlyTying customFlies={customFlies} onAddCustomFly={addCustomFly} onRemoveCustomFly={removeCustomFly} />}
     {activePage === "profile" && <Profile key={profile?.updated_at || user.id} profile={profile} user={user} onSaveProfile={saveProfile} />}
       </main>
 
@@ -1159,6 +1329,23 @@ function mostCommon(items, field) {
 
 function csvCell(value) {
   return `"${String(value).replaceAll('"', '""')}"`
+}
+
+function readStoredList(key) {
+  try {
+    const stored = localStorage.getItem(key)
+    return stored ? JSON.parse(stored) : []
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}
+
+function splitListInput(value) {
+  return value
+    .split(/\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 function parseCatchLength(value) {

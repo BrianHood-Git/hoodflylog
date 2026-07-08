@@ -561,6 +561,50 @@ h3 {
   margin-top: 16px;
 }
 
+.libraryForm {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #dfcda9;
+  border-radius: 12px;
+  background: #fbf4e8;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.compactHeader {
+  margin-bottom: 0;
+}
+
+.libraryFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.libraryForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #4c493d;
+  font-weight: 800;
+}
+
+.libraryForm input,
+.libraryForm textarea {
+  width: 100%;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #061f14;
+  padding: 12px 13px;
+  font: inherit;
+}
+
+.libraryForm textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
 .libraryCard {
   border: 1px solid #dfcda9;
   border-radius: 10px;
@@ -585,6 +629,30 @@ h3 {
 
 .libraryCard li {
   margin-bottom: 6px;
+}
+
+.customBadge {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 10px;
+  border: 1px solid #c6d9a2;
+  border-radius: 999px;
+  background: #e7f0cf;
+  color: #153e27;
+  padding: 5px 9px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.textBtn {
+  margin-top: 12px;
+  border: 0;
+  background: transparent;
+  color: #8a5200;
+  padding: 0;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .bottomNav {
@@ -680,6 +748,10 @@ h3 {
   }
 
   .leaderboardFilters {
+    grid-template-columns: 1fr;
+  }
+
+  .libraryFormGrid {
     grid-template-columns: 1fr;
   }
 
