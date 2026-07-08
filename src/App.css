@@ -418,6 +418,28 @@ h3 {
   color: #5d503e;
 }
 
+.photoActionBtn {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid #c9b98f;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #061f14;
+  padding: 12px 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.photoActionBtn:hover:not(:disabled) {
+  background: #e7f0cf;
+  border-color: #c6d9a2;
+}
+
+.photoActionBtn:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
 .toolBtn {
   width: 100%;
   text-align: left;

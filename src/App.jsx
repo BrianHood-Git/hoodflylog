@@ -39,7 +39,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera }) {
     setIsSaving(false)
 
     if (!saved) {
-      setErrorMessage("That catch stayed on this device, but cloud saving failed.")
+      setErrorMessage("Catch could not be saved. Check your connection and try again.")
       return
     }
 
@@ -104,7 +104,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera }) {
               <span>{selectedPhoto.name}</span>
             </div>
           ) : (
-            <p>Tap the camera button to take or choose a catch photo.</p>
+            <p>Add a photo now, or save the catch and attach one from the Journal later.</p>
           )}
         </div>
 
@@ -167,7 +167,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera }) {
   )
 }
 
-function Journal({ catches }) {
+function Journal({ catches, onChooseCatchPhoto, uploadingCatchId }) {
   return (
     <div className="panel">
       <h2>📖 Journal</h2>
@@ -185,6 +185,14 @@ function Journal({ catches }) {
               <p>🪰 {fish.fly || "No fly listed"}</p>
               <p>🗓️ {fish.date || "No date"} {fish.time || ""}</p>
               {fish.notes && <p>📝 {fish.notes}</p>}
+              <button
+                className="photoActionBtn"
+                disabled={uploadingCatchId === fish.id}
+                onClick={() => onChooseCatchPhoto(fish)}
+                type="button"
+              >
+                {uploadingCatchId === fish.id ? "Uploading..." : fish.photo_url ? "📸 Replace Photo" : "📸 Add Photo"}
+              </button>
             </div>
           ))}
         </div>
@@ -493,6 +501,7 @@ function AuthPanel() {
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
   const cameraInputRef = useRef(null)
+  const savedCatchPhotoInputRef = useRef(null)
   const [catches, setCatches] = useState(() => {
     const saved = localStorage.getItem("hoodflylog-catches")
     return saved ? JSON.parse(saved) : []
@@ -503,6 +512,8 @@ function App() {
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [profile, setProfile] = useState(null)
+  const [photoTargetCatch, setPhotoTargetCatch] = useState(null)
+  const [uploadingCatchId, setUploadingCatchId] = useState("")
   const user = session?.user
   
   useEffect(() => {
@@ -664,11 +675,6 @@ async function handleSaveCatch(newCatch) {
     catchToSave.notes = catchToSave.notes ? `${catchToSave.notes}\n\n${photoUploadNote}` : photoUploadNote
   }
 
-  const fallbackCatch = {
-    id: crypto.randomUUID(),
-    ...catchToSave,
-  }
-
   const { data, error } = await supabase
     .from("catches")
     .insert([catchToSave])
@@ -677,14 +683,11 @@ async function handleSaveCatch(newCatch) {
 
   if (error) {
     console.error(error)
-    setCatches((currentCatches) => [fallbackCatch, ...currentCatches])
-    setLoadStatus("Cloud save failed. This catch is saved on this device.")
-    clearSelectedPhoto()
-    setActivePage("history")
-    return true
+    setLoadStatus("Cloud save failed. Check your connection and try again.")
+    return false
   }
 
-  setCatches((currentCatches) => [data || fallbackCatch, ...currentCatches])
+  setCatches((currentCatches) => [data, ...currentCatches])
   clearSelectedPhoto()
   setActivePage("history")
   return true
@@ -777,6 +780,71 @@ function handlePhotoSelected(event) {
       previewUrl: URL.createObjectURL(file),
     }
   })
+}
+
+function openSavedCatchPhotoPicker(fish) {
+  setPhotoTargetCatch(fish)
+  window.setTimeout(() => {
+    savedCatchPhotoInputRef.current?.click()
+  }, 100)
+}
+
+async function handleSavedCatchPhotoSelected(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ""
+
+  if (!file || !photoTargetCatch) {
+    return
+  }
+
+  setUploadingCatchId(photoTargetCatch.id)
+
+  const filePath = createCatchPhotoPath(file, user.id)
+  const { error: uploadError } = await supabase.storage
+    .from("catch-photos")
+    .upload(filePath, file, {
+      cacheControl: "3600",
+      upsert: false,
+    })
+
+  if (uploadError) {
+    console.error(uploadError)
+    alert("Photo upload failed. Check your connection and try again.")
+    setUploadingCatchId("")
+    setPhotoTargetCatch(null)
+    return
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from("catch-photos")
+    .getPublicUrl(filePath)
+
+  const photoUpdate = {
+    photo_path: filePath,
+    photo_url: publicUrlData.publicUrl,
+  }
+
+  const { data, error: updateError } = await supabase
+    .from("catches")
+    .update(photoUpdate)
+    .eq("id", photoTargetCatch.id)
+    .eq("user_id", user.id)
+    .select()
+    .single()
+
+  if (updateError) {
+    console.error(updateError)
+    alert("Photo uploaded, but the catch could not be updated. Try again from the Journal.")
+    setUploadingCatchId("")
+    setPhotoTargetCatch(null)
+    return
+  }
+
+  setCatches((currentCatches) =>
+    currentCatches.map((fish) => fish.id === photoTargetCatch.id ? data : fish)
+  )
+  setUploadingCatchId("")
+  setPhotoTargetCatch(null)
 }
 
 function handleNavClick(item) {
@@ -933,7 +1001,7 @@ async function saveProfile(formData) {
     )}
 
    {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} selectedPhoto={selectedPhoto} onOpenCamera={openCamera} />}
-{activePage === "history" && <Journal catches={catches} />}
+{activePage === "history" && <Journal catches={catches} onChooseCatchPhoto={openSavedCatchPhotoPicker} uploadingCatchId={uploadingCatchId} />}
     {activePage === "knots" && <Knots />}
     {activePage === "flytying" && <FlyTying />}
     {activePage === "profile" && <Profile key={profile?.updated_at || user.id} profile={profile} user={user} onSaveProfile={saveProfile} />}
@@ -958,6 +1026,14 @@ async function saveProfile(formData) {
         accept="image/*"
         capture="environment"
         onChange={handlePhotoSelected}
+      />
+      <input
+        ref={savedCatchPhotoInputRef}
+        className="cameraInput"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleSavedCatchPhotoSelected}
       />
       </div>
     </div>
