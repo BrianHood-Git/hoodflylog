@@ -3,7 +3,7 @@ import { supabase } from "./supabase"
 import LandingPage from "./components/LandingPage"
 import logo from "./assets/hoodflylog-logo.jpg"
 import "./App.css"
-function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera }) {
+function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
   const [formData, setFormData] = useState(() => createBlankCatchForm())
   const [errorMessage, setErrorMessage] = useState("")
   const [isSaving, setIsSaving] = useState(false)
@@ -95,9 +95,14 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera }) {
 
       <form className="catchForm">
         <div className="photoCapture fullWidth">
-          <button type="button" className="cameraBtn" onClick={onOpenCamera}>
-            📸 Add Catch Photo
-          </button>
+          <div className="photoButtonRow">
+            <button type="button" className="cameraBtn" onClick={onOpenCamera}>
+              📸 Take Photo
+            </button>
+            <button type="button" className="secondaryBtn" onClick={onChoosePhoto}>
+              🖼️ Choose Photo
+            </button>
+          </div>
           {selectedPhoto ? (
             <div className="photoPreview">
               <img src={selectedPhoto.previewUrl} alt="Catch preview" />
@@ -501,6 +506,7 @@ function AuthPanel() {
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
   const cameraInputRef = useRef(null)
+  const galleryInputRef = useRef(null)
   const savedCatchPhotoInputRef = useRef(null)
   const [catches, setCatches] = useState(() => {
     const saved = localStorage.getItem("hoodflylog-catches")
@@ -762,6 +768,13 @@ function openCamera() {
   }, 100)
 }
 
+function openGallery() {
+  setActivePage("log")
+  window.setTimeout(() => {
+    galleryInputRef.current?.click()
+  }, 100)
+}
+
 function handlePhotoSelected(event) {
   const file = event.target.files?.[0]
 
@@ -1000,7 +1013,7 @@ async function saveProfile(formData) {
               </>
     )}
 
-   {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} selectedPhoto={selectedPhoto} onOpenCamera={openCamera} />}
+   {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} selectedPhoto={selectedPhoto} onOpenCamera={openCamera} onChoosePhoto={openGallery} />}
 {activePage === "history" && <Journal catches={catches} onChooseCatchPhoto={openSavedCatchPhotoPicker} uploadingCatchId={uploadingCatchId} />}
     {activePage === "knots" && <Knots />}
     {activePage === "flytying" && <FlyTying />}
@@ -1028,11 +1041,17 @@ async function saveProfile(formData) {
         onChange={handlePhotoSelected}
       />
       <input
+        ref={galleryInputRef}
+        className="cameraInput"
+        type="file"
+        accept="image/*"
+        onChange={handlePhotoSelected}
+      />
+      <input
         ref={savedCatchPhotoInputRef}
         className="cameraInput"
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={handleSavedCatchPhotoSelected}
       />
       </div>
