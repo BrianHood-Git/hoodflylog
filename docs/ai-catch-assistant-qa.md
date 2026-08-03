@@ -11,7 +11,11 @@ Use this checklist with the same catch photos when comparing Cloudflare Workers 
 5. Confirm the assistant suggests species/conditions, keeps the location as coordinates, and does not save automatically.
 6. Correct at least one suggested value and verify the edit remains.
 7. Save the catch and confirm the edited values appear in Journal.
-8. Repeat with the place-name checkbox enabled. Confirm the UI discloses BigDataCloud before GPS is sent and the suggested place remains editable.
+8. Repeat with the place-name checkbox enabled. Confirm the UI discloses the configured location lookup before GPS is sent, shows provider attribution after lookup, and keeps the suggested place editable.
+
+## Location-provider setup
+
+Create a free Geoapify key and store it with `npx wrangler secret put GEOAPIFY_API_KEY`. The key stays in Cloudflare and enables named park/waterbody suggestions. Without it, the app falls back to BigDataCloud locality results such as city and state.
 
 ## Failure and privacy checks
 

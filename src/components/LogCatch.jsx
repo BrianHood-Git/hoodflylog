@@ -12,6 +12,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
   const [analysisStatus, setAnalysisStatus] = useState("")
   const [analysis, setAnalysis] = useState(null)
   const [allowPlaceLookup, setAllowPlaceLookup] = useState(false)
+  const [locationAttribution, setLocationAttribution] = useState(null)
 
   function updateField(field, value) {
     setFormData((current) => ({ ...current, [field]: value }))
@@ -60,21 +61,20 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
       const latitude = Number(position.coords.latitude.toFixed(5))
       const longitude = Number(position.coords.longitude.toFixed(5))
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,pressure_msl,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`
-      const placeUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
-      const [response, placeResponse] = await Promise.all([
+      const [response, place] = await Promise.all([
         fetch(weatherUrl),
-        allowPlaceLookup ? fetch(placeUrl).catch(() => null) : Promise.resolve(null),
+        allowPlaceLookup ? fetchPlaceSuggestion(latitude, longitude) : Promise.resolve(null),
       ])
 
       if (!response.ok) throw new Error("Weather request failed")
 
       const weather = await response.json()
-      const place = placeResponse?.ok ? await placeResponse.json() : null
+      if (place?.attribution) setLocationAttribution(place)
       const current = weather.current || {}
       const context = {
         latitude,
         longitude,
-        placeName: formatPlaceName(place),
+        placeName: place?.placeName || "",
         timezone: weather.timezone || "",
         temperatureF: current.temperature_2m ?? null,
         windMph: current.wind_speed_10m ?? null,
@@ -206,9 +206,15 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
           </button>
           <small className="aiPrivacyNote">Uses your photo and, with permission, approximate GPS and current weather. AI suggestions may be wrong.</small>
           <label className="placeLookupConsent">
-            <input type="checkbox" checked={allowPlaceLookup} onChange={(event) => setAllowPlaceLookup(event.target.checked)} />
-            Suggest a nearby place name by sending GPS coordinates to BigDataCloud
+            <input type="checkbox" checked={allowPlaceLookup} onChange={(event) => {
+              setAllowPlaceLookup(event.target.checked)
+              if (!event.target.checked) setLocationAttribution(null)
+            }} />
+            Suggest a nearby park or waterbody by sending GPS coordinates to the configured location service
           </label>
+          {locationAttribution && (
+            <small className="aiPrivacyNote">Location data: <a href={locationAttribution.attributionUrl} target="_blank" rel="noreferrer">{locationAttribution.attribution}</a></small>
+          )}
         </div>
 
         {analysisStatus && <p className="formMessage fullWidth" role="status">{analysisStatus}</p>}
@@ -272,12 +278,21 @@ function getCurrentPosition() {
   })
 }
 
-function formatPlaceName(place) {
-  if (!place) return ""
-  const locality = place.locality || place.city || place.localityInfo?.administrative?.[0]?.name || ""
-  return [...new Set([locality, place.principalSubdivision, place.countryName].filter(Boolean))].join(", ")
-}
+async function fetchPlaceSuggestion(latitude, longitude) {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const accessToken = data.session?.access_token
+    if (!accessToken) return null
 
+    const response = await fetch(`/api/location-suggestion?latitude=${latitude}&longitude=${longitude}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!response.ok) return null
+    return response.json()
+  } catch {
+    return null
+  }
+}
 function formatWeatherNote(weather) {
   return [
     weather.placeName ? `Nearby place: ${weather.placeName}` : "",
@@ -299,8 +314,14 @@ function formatConfidence(value) {
 
 async function prepareImageForAnalysis(file) {
   if (!file.type.startsWith("image/")) return file
+  if (typeof createImageBitmap !== "function") return file
 
-  const bitmap = await createImageBitmap(file)
+  let bitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    return file
+  }
   const maxDimension = 1280
   const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement("canvas")

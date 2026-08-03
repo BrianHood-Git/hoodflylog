@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import {
   analyzeWithWorkersAi,
   buildPrompt,
+  chooseGeoapifySuggestion,
   normalizeSuggestions,
   parseModelJson,
   rulesFallback,
@@ -70,4 +71,18 @@ test("Workers AI adapter sends Moondream query input and reads its answer", asyn
   assert.match(request.input.image, /^data:image\/jpeg;base64,/)
   assert.match(request.input.question, /Return only valid JSON/)
   assert.equal(result.text, '{"species":"Bluegill","confidence":0.75}')
+})
+
+test("Geoapify selector prefers the nearest named park or water feature", () => {
+  const value = chooseGeoapifySuggestion({
+    features: [
+      { properties: { name: "Far Park", city: "Schertz", state: "Texas", distance: 350, categories: ["leisure.park"] } },
+      { properties: { name: "Crescent Bend Nature Park", city: "Schertz", state: "Texas", distance: 0, categories: ["leisure.park.nature_reserve"] } },
+      { properties: { city: "Schertz", distance: 0 } },
+    ],
+  })
+
+  assert.equal(value.placeName, "Crescent Bend Nature Park, Schertz, Texas")
+  assert.equal(value.distanceMeters, 0)
+  assert.equal(value.source, "geoapify")
 })

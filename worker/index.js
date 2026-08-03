@@ -1,6 +1,7 @@
 const WORKERS_VISION_MODEL = "@cf/moondream/moondream3.1-9B-A2B"
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const DAILY_REQUEST_LIMIT = 10
+const DAILY_LOCATION_LIMIT = 50
 
 export default {
   async fetch(request, env, context) {
@@ -13,10 +14,136 @@ export default {
       return analyzeCatch(request, env, context)
     }
 
+    if (url.pathname === "/api/location-suggestion") {
+      if (request.method !== "GET") {
+        return json({ error: "Method not allowed" }, 405)
+      }
+      return suggestLocation(request, env, context)
+    }
     return env.ASSETS.fetch(request)
   },
 }
 
+async function suggestLocation(request, env, context) {
+  const user = await authenticateUser(request, env)
+  if (!user) return json({ error: "Sign in before requesting a location suggestion." }, 401)
+
+  const url = new URL(request.url)
+  const latitude = Number(url.searchParams.get("latitude"))
+  const longitude = Number(url.searchParams.get("longitude"))
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+    || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return json({ error: "Valid latitude and longitude are required." }, 400)
+  }
+
+  const configuredProvider = env.GEOAPIFY_API_KEY ? "geoapify" : "bigdatacloud"
+  const cacheKey = new Request(`https://location-cache.internal/${configuredProvider}/${latitude.toFixed(4)}/${longitude.toFixed(4)}`)
+  const cache = globalThis.caches?.default
+  const cached = cache ? await cache.match(cacheKey) : null
+  if (cached) return json(await cached.json())
+
+  const rateLimit = await consumeDailyLimit(user.id, "location-suggestion", DAILY_LOCATION_LIMIT, context)
+  if (!rateLimit.allowed) {
+    return json({ error: `Daily location-suggestion limit reached (${DAILY_LOCATION_LIMIT}).` }, 429)
+  }
+
+  let suggestion = null
+  if (env.GEOAPIFY_API_KEY) {
+    try {
+      suggestion = await suggestWithGeoapify(latitude, longitude, env.GEOAPIFY_API_KEY)
+    } catch (error) {
+      console.error("Geoapify location lookup failed", error)
+    }
+  }
+
+  if (!suggestion) {
+    try {
+      suggestion = await suggestWithBigDataCloud(latitude, longitude)
+    } catch (error) {
+      console.error("BigDataCloud location fallback failed", error)
+    }
+  }
+
+  const payload = suggestion || {
+    placeName: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+    source: "coordinates",
+    attribution: "",
+    attributionUrl: "",
+  }
+
+  if (cache) {
+    context.waitUntil(cache.put(cacheKey, new Response(JSON.stringify(payload), {
+      headers: {
+        "Cache-Control": `public, max-age=${payload.source === "geoapify" ? 2592000 : 86400}`,
+        "Content-Type": "application/json",
+      },
+    })))
+  }
+
+  return json(payload)
+}
+
+async function suggestWithGeoapify(latitude, longitude, apiKey) {
+  const params = new URLSearchParams({
+    categories: "leisure.park,leisure.park.nature_reserve,natural.water,natural.protected_area,waterway",
+    filter: `circle:${longitude},${latitude},2000`,
+    bias: `proximity:${longitude},${latitude}`,
+    limit: "10",
+    apiKey,
+  })
+  const response = await fetch(`https://api.geoapify.com/v2/places?${params}`)
+  if (!response.ok) throw new Error(`Geoapify lookup failed (${response.status}).`)
+  return chooseGeoapifySuggestion(await response.json())
+}
+
+function chooseGeoapifySuggestion(payload) {
+  const candidates = (payload?.features || [])
+    .map((feature) => feature?.properties || {})
+    .filter((properties) => cleanString(properties.name, 120))
+    .sort((left, right) => {
+      const leftDistance = Number(left.distance)
+      const rightDistance = Number(right.distance)
+      return (Number.isFinite(leftDistance) ? leftDistance : Number.MAX_SAFE_INTEGER)
+        - (Number.isFinite(rightDistance) ? rightDistance : Number.MAX_SAFE_INTEGER)
+    })
+
+  const place = candidates[0]
+  if (!place) return null
+  return {
+    placeName: uniqueLocationParts([place.name, place.city, place.state]),
+    source: "geoapify",
+    featureType: Array.isArray(place.categories) ? place.categories[0] || "" : "",
+    distanceMeters: Number.isFinite(Number(place.distance)) ? Math.round(Number(place.distance)) : null,
+    attribution: "Powered by Geoapify; data © OpenStreetMap contributors",
+    attributionUrl: "https://www.openstreetmap.org/copyright",
+  }
+}
+
+async function suggestWithBigDataCloud(latitude, longitude) {
+  const params = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    localityLanguage: "en",
+  })
+  const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${params}`)
+  if (!response.ok) throw new Error(`BigDataCloud lookup failed (${response.status}).`)
+  const place = await response.json()
+  const locality = place.locality || place.city || place.localityInfo?.administrative?.[0]?.name || ""
+  const placeName = uniqueLocationParts([locality, place.principalSubdivision, place.countryName])
+  if (!placeName) return null
+  return {
+    placeName,
+    source: "bigdatacloud",
+    featureType: "locality",
+    distanceMeters: null,
+    attribution: "Location by BigDataCloud",
+    attributionUrl: "https://www.bigdatacloud.com/",
+  }
+}
+
+function uniqueLocationParts(parts) {
+  return [...new Set(parts.map((part) => cleanString(part, 120)).filter(Boolean))].join(", ")
+}
 async function analyzeCatch(request, env, context) {
   try {
     const user = await authenticateUser(request, env)
@@ -178,23 +305,26 @@ async function authenticateUser(request, env) {
 }
 
 async function consumeDailyRequest(userId, env, context) {
-  if (!globalThis.caches?.default) return { allowed: true, remaining: DAILY_REQUEST_LIMIT - 1 }
+  return consumeDailyLimit(userId, "catch-assistant", DAILY_REQUEST_LIMIT, context)
+}
+
+async function consumeDailyLimit(userId, bucket, limit, context) {
+  if (!globalThis.caches?.default) return { allowed: true, remaining: limit - 1 }
 
   const date = new Date().toISOString().slice(0, 10)
   const userHash = await sha256(userId)
-  const key = new Request(`https://rate-limit.internal/catch-assistant/${date}/${userHash}`)
+  const key = new Request(`https://rate-limit.internal/${bucket}/${date}/${userHash}`)
   const cached = await caches.default.match(key)
   const used = cached ? Number(await cached.text()) || 0 : 0
-  if (used >= DAILY_REQUEST_LIMIT) return { allowed: false, remaining: 0 }
+  if (used >= limit) return { allowed: false, remaining: 0 }
 
   const secondsUntilTomorrow = Math.max(60, Math.floor((Date.parse(`${date}T23:59:59Z`) - Date.now()) / 1000))
   context.waitUntil(caches.default.put(key, new Response(String(used + 1), {
     headers: { "Cache-Control": `max-age=${secondsUntilTomorrow}` },
   })))
 
-  return { allowed: true, remaining: DAILY_REQUEST_LIMIT - used - 1 }
+  return { allowed: true, remaining: limit - used - 1 }
 }
-
 function parseContext(raw) {
   if (typeof raw !== "string") return {}
   try {
@@ -256,6 +386,7 @@ function json(payload, status = 200) {
 
 export {
   analyzeWithWorkersAi,
+  chooseGeoapifySuggestion,
   buildPrompt,
   normalizeSuggestions,
   parseModelJson,

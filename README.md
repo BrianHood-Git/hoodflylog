@@ -228,10 +228,12 @@ First, enhance Log Catch so an uploaded photo plus GPS and weather can suggest c
 ### Catch Assistant implementation notes
 - The hosted default is Cloudflare Workers AI using `@cf/moondream/moondream3.1-9B-A2B`, selected for efficient structured vision analysis without the separate Meta model-acceptance step.
 - The endpoint requires a valid HoodFlyLog Supabase session and accepts images up to 5 MB.
-- Each account is limited to 10 server-side analysis attempts per UTC day; the browser also limits normal use to 5.
-- Photos and optional GPS/weather context are sent only when the angler presses **Analyze Photo + Conditions**. A separate, default-off checkbox is required before coordinates are sent to BigDataCloud for a nearby place-name suggestion.
+- Each account is limited to 10 server-side analysis attempts and 50 uncached location lookups per UTC day; the browser also limits normal AI use to 5.
+- Photos and optional GPS/weather context are sent only when the angler presses **Analyze Photo + Conditions**. A separate, default-off checkbox is required before coordinates are sent to the configured location service.
 - AI suggestions are never saved automatically. Every populated field remains editable and the user must press **Save Catch**.
 - The Worker never asks the model to infer a named location from coordinates or estimate length without a visible scale reference.
+- For named parks and waterbodies, set the encrypted `GEOAPIFY_API_KEY` Worker secret. Geoapify Places is queried server-side and cached; without the key, BigDataCloud supplies a city/state locality fallback.
+- Configure the key with `npx wrangler secret put GEOAPIFY_API_KEY`; never commit it.
 - Local full-stack testing: `npm run dev:worker`.
 - To evaluate Hugging Face instead, set `AI_PROVIDER=huggingface`, `HF_MODEL`, and the encrypted `HF_TOKEN` Worker secret.
 - Use [`docs/ai-catch-assistant-qa.md`](docs/ai-catch-assistant-qa.md) for the live smoke test and same-photo provider comparison.
