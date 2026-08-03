@@ -1,10 +1,19 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hoodflylog",
+  "main": "worker/index.js",
   "compatibility_date": "2026-08-03",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "AI_PROVIDER": "workers-ai",
+    "SUPABASE_URL": "https://tkzcspqyiqmqmyjrouzn.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRremNzcHF5aXFtcW15anJvdXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0Nzk3NzQsImV4cCI6MjA5NzA1NTc3NH0.XBA1HJQ_Cxif4bUfqVgo8BjSO3NB0WeazbCJSycANrU"
   }
 }
-

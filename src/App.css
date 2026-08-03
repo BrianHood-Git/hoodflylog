@@ -1,3 +1,45 @@
+.aiAnalyzeBtn {
+  border: 1px solid #78913e;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #e7f0cf, #c9d8a6);
+  color: #061f14;
+  padding: 13px 16px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.aiAnalyzeBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.aiPrivacyNote {
+  color: #665b48;
+  line-height: 1.4;
+}
+
+.aiSuggestionCard {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #b7ca91;
+  border-radius: 12px;
+  background: #eef5dc;
+  padding: 14px;
+}
+
+.aiSuggestionCard > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.aiSuggestionCard p {
+  margin: 0;
+  color: #3e5130;
+}
+
 .moderatorPanel {
   display: grid;
   gap: 18px;
@@ -1116,4 +1158,20 @@ h3 {
 @media (max-width: 700px) {
   .moderationEditForm { grid-template-columns: 1fr; }
   .catchAdminActions { justify-content: stretch; }
+}
+
+.catchForm .placeLookupConsent {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: row;
+  font-size: 0.82rem;
+  gap: 0.55rem;
+  line-height: 1.35;
+}
+
+.catchForm .placeLookupConsent input {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  padding: 0;
+  width: auto;
 }
