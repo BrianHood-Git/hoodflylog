@@ -3,6 +3,8 @@ import { supabase } from "./supabase"
 import LandingPage from "./components/LandingPage"
 import logo from "./assets/hoodflylog-logo.jpg"
 import "./App.css"
+const OWNER_EMAIL = "nasskater89@gmail.com"
+
 function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
   const [formData, setFormData] = useState(() => createBlankCatchForm())
   const [errorMessage, setErrorMessage] = useState("")
@@ -190,6 +192,7 @@ function Journal({ catches, onChooseCatchPhoto, uploadingCatchId }) {
               <p>🪰 {fish.fly || "No fly listed"}</p>
               <p>🗓️ {fish.date || "No date"} {fish.time || ""}</p>
               {fish.notes && <p>📝 {fish.notes}</p>}
+              <span className={`moderationBadge ${fish.moderation_status || "pending"}`}>{fish.moderation_status || "pending"}</span>
               <button
                 className="photoActionBtn"
                 disabled={uploadingCatchId === fish.id}
@@ -728,6 +731,224 @@ function AuthPanel() {
   )
 }
 
+function ModeratorAdmin({ currentUser }) {
+  const [users, setUsers] = useState([])
+  const [managedCatches, setManagedCatches] = useState([])
+  const [catchFilter, setCatchFilter] = useState("pending")
+  const [editingCatchId, setEditingCatchId] = useState("")
+  const [editForm, setEditForm] = useState({})
+  const [email, setEmail] = useState("")
+  const [status, setStatus] = useState("Loading moderation tools...")
+  const [isSaving, setIsSaving] = useState(false)
+
+  async function loadData() {
+    const [profiles, catches] = await Promise.all([
+      supabase.from("profiles").select("id, email, display_name, role, is_banned, ban_reason").order("email"),
+      supabase.from("catches").select("*").order("created_at", { ascending: false }),
+    ])
+    const error = profiles.error || catches.error
+    if (error) {
+      console.error(error)
+      setStatus(error.message || "Moderation data could not be loaded.")
+      return
+    }
+    setUsers(profiles.data || [])
+    setManagedCatches(catches.data || [])
+    setStatus("")
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => loadData(), 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  async function runAction(action, message) {
+    setIsSaving(true)
+    setStatus("Saving...")
+    const { error } = await action()
+    if (error) {
+      console.error(error)
+      setStatus(error.message || "The moderation action failed.")
+    } else {
+      await loadData()
+      setStatus(message)
+    }
+    setIsSaving(false)
+  }
+
+  function setModeratorRole(targetEmail, makeModerator) {
+    return runAction(() => supabase.rpc("set_moderator_role", {
+      target_email: targetEmail.trim().toLowerCase(),
+      make_moderator: makeModerator,
+    }), makeModerator ? "Moderator added." : "Moderator removed.")
+  }
+
+  function addModerator(event) {
+    event.preventDefault()
+    if (!email.trim()) return setStatus("Enter the angler's account email.")
+    setModeratorRole(email, true)
+    setEmail("")
+  }
+
+  function reviewCatch(catchId, decision) {
+    return runAction(
+      () => supabase.rpc("review_catch", { catch_id: catchId, decision }),
+      `Catch ${decision}.`
+    )
+  }
+
+  function beginEditing(fish) {
+    setEditingCatchId(fish.id)
+    setEditForm({
+      species: fish.species || "",
+      location: fish.location || "",
+      length: fish.length || "",
+      fly: fish.fly || "",
+      date: fish.date || "",
+      time: fish.time || "",
+      notes: fish.notes || "",
+      is_public: fish.is_public !== false,
+    })
+  }
+
+  function updateEditField(field, value) {
+    setEditForm((current) => ({ ...current, [field]: value }))
+  }
+
+  async function saveCatchEdits(event) {
+    event.preventDefault()
+    await runAction(
+      () => supabase.rpc("moderator_update_catch", { catch_id: editingCatchId, changes: editForm }),
+      "Catch updated."
+    )
+    setEditingCatchId("")
+  }
+
+  function deleteCatch(fish) {
+    const label = fish.species || "this catch"
+    if (!window.confirm(`Permanently delete ${label}? This cannot be undone.`)) return
+    return runAction(
+      () => supabase.rpc("moderator_delete_catch", { catch_id: fish.id }),
+      "Catch deleted."
+    )
+  }
+
+  function setUserBan(targetEmail, shouldBan) {
+    const reason = shouldBan ? window.prompt("Reason for banning this user?")?.trim() : ""
+    if (shouldBan && !reason) return setStatus("A ban reason is required.")
+    return runAction(() => supabase.rpc("set_user_ban", {
+      target_email: targetEmail.toLowerCase(),
+      should_ban: shouldBan,
+      reason,
+    }), shouldBan ? "User banned." : "User unbanned.")
+  }
+
+  const moderators = users.filter((account) => account.role === "moderator")
+  const visibleCatches = catchFilter === "all"
+    ? managedCatches
+    : managedCatches.filter((fish) => fish.moderation_status === catchFilter)
+  const pendingCount = managedCatches.filter((fish) => fish.moderation_status === "pending").length
+
+  return (
+    <div className="moderationStack">
+      <section className="panel moderatorPanel">
+        <div className="pageHeader compactHeader">
+          <div><p className="eyebrow">Catch management</p><h2>🛡️ Catch Moderation</h2><p>Review, edit, change status, or delete any catch.</p></div>
+          <span className="customBadge">{pendingCount} pending</span>
+        </div>
+        {status && <p className="formMessage" role="status">{status}</p>}
+        <div className="moderationFilters">
+          {["pending", "approved", "rejected", "all"].map((filter) => (
+            <button className={catchFilter === filter ? "active" : ""} key={filter} onClick={() => setCatchFilter(filter)} type="button">{filter}</button>
+          ))}
+        </div>
+        <div className="moderationQueue">
+          {visibleCatches.map((fish) => {
+            const angler = users.find((account) => account.id === fish.user_id)
+            const isEditing = editingCatchId === fish.id
+            return (
+              <article className="moderationCatchCard" key={fish.id}>
+                {fish.photo_url && <img src={fish.photo_url} alt={fish.species || "Catch"} className="catchPhoto" />}
+                {isEditing ? (
+                  <form className="moderationEditForm" onSubmit={saveCatchEdits}>
+                    <label>Species<input value={editForm.species} onChange={(event) => updateEditField("species", event.target.value)} /></label>
+                    <label>Location<input value={editForm.location} onChange={(event) => updateEditField("location", event.target.value)} /></label>
+                    <label>Length<input value={editForm.length} onChange={(event) => updateEditField("length", event.target.value)} /></label>
+                    <label>Fly<input value={editForm.fly} onChange={(event) => updateEditField("fly", event.target.value)} /></label>
+                    <label>Date<input type="date" value={editForm.date} onChange={(event) => updateEditField("date", event.target.value)} /></label>
+                    <label>Time<input type="time" value={editForm.time} onChange={(event) => updateEditField("time", event.target.value)} /></label>
+                    <label className="fullWidth">Notes<textarea value={editForm.notes} onChange={(event) => updateEditField("notes", event.target.value)} /></label>
+                    <label className="checkboxLabel"><input type="checkbox" checked={editForm.is_public} onChange={(event) => updateEditField("is_public", event.target.checked)} /> Public catch</label>
+                    <div className="moderationActions fullWidth">
+                      <button className="heroBtn" disabled={isSaving} type="submit">Save changes</button>
+                      <button className="secondaryBtn" onClick={() => setEditingCatchId("")} type="button">Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <div>
+                    <span className={`moderationBadge ${fish.moderation_status}`}>{fish.moderation_status}</span>
+                    <h3>{fish.species || "Unknown Fish"}</h3>
+                    <p>Angler: {angler?.display_name || angler?.email || shortAnglerId(fish.user_id)}</p>
+                    <p>📍 {fish.location || "No location"} · 📏 {fish.length || "No length"}</p>
+                    <p>🪰 {fish.fly || "No fly listed"}</p>
+                    {fish.notes && <p>📝 {fish.notes}</p>}
+                  </div>
+                )}
+                {!isEditing && <div className="moderationActions catchAdminActions">
+                  <button className="heroBtn" disabled={isSaving} onClick={() => reviewCatch(fish.id, "approved")} type="button">Approve</button>
+                  <button className="secondaryBtn" disabled={isSaving} onClick={() => reviewCatch(fish.id, "rejected")} type="button">Reject</button>
+                  <button className="secondaryBtn" disabled={isSaving} onClick={() => beginEditing(fish)} type="button">Edit</button>
+                  <button className="dangerBtn" disabled={isSaving} onClick={() => deleteCatch(fish)} type="button">Delete</button>
+                </div>}
+              </article>
+            )
+          })}
+          {visibleCatches.length === 0 && <p>No {catchFilter === "all" ? "" : catchFilter} catches found.</p>}
+        </div>
+      </section>
+
+      <section className="panel moderatorPanel">
+        <div className="pageHeader compactHeader"><div><p className="eyebrow">Access</p><h2>Moderators</h2></div></div>
+        <form className="moderatorForm" onSubmit={addModerator}>
+          <label>Angler email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="angler@example.com" disabled={isSaving} /></label>
+          <button className="heroBtn" type="submit" disabled={isSaving}>Add moderator</button>
+        </form>
+        <div className="moderatorList">
+          {moderators.map((moderator) => {
+            const accountEmail = moderator.email?.toLowerCase()
+            const protectedAccount = accountEmail === OWNER_EMAIL || accountEmail === currentUser.email?.toLowerCase()
+            return <div className="moderatorCard" key={moderator.id}>
+              <div><strong>{moderator.display_name || moderator.email}</strong><p>{moderator.email}</p></div>
+              {protectedAccount ? <span className="customBadge">Protected</span> : <button className="textBtn" type="button" disabled={isSaving} onClick={() => setModeratorRole(moderator.email, false)}>Remove</button>}
+            </div>
+          })}
+        </div>
+      </section>
+
+      <section className="panel moderatorPanel">
+        <div className="pageHeader compactHeader"><div><p className="eyebrow">Community safety</p><h2>User Accounts</h2><p>Banned users cannot enter the app or add catches.</p></div></div>
+        <div className="moderatorList">
+          {users.map((account) => {
+            const accountEmail = account.email?.toLowerCase()
+            const protectedAccount = accountEmail === OWNER_EMAIL || accountEmail === currentUser.email?.toLowerCase()
+            return <div className="moderatorCard" key={account.id}>
+              <div><strong>{account.display_name || account.email}</strong><p>{account.email} · {account.role || "angler"}</p>{account.is_banned && <p className="banReason">Banned: {account.ban_reason || "No reason provided"}</p>}</div>
+              {protectedAccount ? <span className="customBadge">Protected</span> : <button className={account.is_banned ? "secondaryBtn" : "dangerBtn"} disabled={isSaving} onClick={() => setUserBan(account.email, !account.is_banned)} type="button">{account.is_banned ? "Unban" : "Ban"}</button>}
+            </div>
+          })}
+        </div>
+      </section>
+    </div>
+  )
+}
+function BannedAccount({ profile, onSignOut }) {
+  return <div className="authShell"><div className="authPanel">
+    <p className="eyebrow">Account restricted</p>
+    <h2>This account has been banned</h2>
+    <p>{profile?.ban_reason || "Contact HoodFlyLog moderation if you believe this was a mistake."}</p>
+    <button className="secondaryBtn" onClick={onSignOut} type="button">Sign Out</button>
+  </div></div>
+}
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
   const cameraInputRef = useRef(null)
@@ -743,11 +964,13 @@ function App() {
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [profile, setProfile] = useState(null)
+  const [communityCatches, setCommunityCatches] = useState([])
   const [photoTargetCatch, setPhotoTargetCatch] = useState(null)
   const [uploadingCatchId, setUploadingCatchId] = useState("")
   const [customKnots, setCustomKnots] = useState(() => readStoredList("hoodflylog-custom-knots"))
   const [customFlies, setCustomFlies] = useState(() => readStoredList("hoodflylog-custom-flies"))
   const user = session?.user
+  const isModerator = profile?.role === "moderator" || user?.email?.toLowerCase() === OWNER_EMAIL
   
   useEffect(() => {
     localStorage.setItem("hoodflylog-catches", JSON.stringify(catches))
@@ -830,7 +1053,7 @@ function App() {
       if (user) {
         query = query.eq("user_id", user.id)
       } else {
-        query = query.eq("is_public", true)
+        query = query.eq("is_public", true).eq("moderation_status", "approved")
       }
 
       const { data, error } = await query
@@ -848,6 +1071,15 @@ function App() {
 
     loadCatches()
   }, [user, profile])
+
+  useEffect(() => {
+    async function loadCommunityCatches() {
+      const { data, error } = await supabase.from("catches").select("*").eq("is_public", true).eq("moderation_status", "approved").order("date", { ascending: false })
+      if (error) return console.error(error)
+      setCommunityCatches(await attachAnglerNames(data || [], profile))
+    }
+    loadCommunityCatches()
+  }, [profile])
 
   useEffect(() => {
     return () => {
@@ -885,11 +1117,15 @@ function App() {
   }
 
   if (viewMode === "public") {
-    return <LandingPage catches={catches} onEnterApp={() => setViewMode("app")} />
+    return <LandingPage catches={communityCatches} onEnterApp={() => setViewMode("app")} />
   }
 
   if (!user) {
     return <AuthPanel />
+  }
+
+  if (profile?.is_banned) {
+    return <BannedAccount profile={profile} onSignOut={signOut} />
   }
 
   const navItems = [
@@ -902,6 +1138,7 @@ function App() {
   const sidebarItems = [
     ...navItems,
     { id: "leaderboard", label: "Leaderboard", icon: "🏆" },
+    ...(isModerator ? [{ id: "moderators", label: "Moderation", icon: "🛡️" }] : []),
     { id: "profile", label: "Profile", icon: "👤" },
   ]
   const displayName = profile?.display_name || user.email?.split("@")[0] || "angler"
@@ -912,6 +1149,7 @@ async function handleSaveCatch(newCatch) {
     ...newCatch,
     ...photoDetails,
     user_id: user.id,
+    moderation_status: "pending",
   }
 
   if (photoUploadNote) {
@@ -1269,10 +1507,11 @@ async function saveProfile(formData) {
 
    {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} selectedPhoto={selectedPhoto} onOpenCamera={openCamera} onChoosePhoto={openGallery} />}
 {activePage === "history" && <Journal catches={catches} onChooseCatchPhoto={openSavedCatchPhotoPicker} uploadingCatchId={uploadingCatchId} />}
-    {activePage === "leaderboard" && <Leaderboard catches={catches} onLogCatch={() => setActivePage("log")} />}
+    {activePage === "leaderboard" && <Leaderboard catches={communityCatches} onLogCatch={() => setActivePage("log")} />}
     {activePage === "knots" && <Knots customKnots={customKnots} onAddCustomKnot={addCustomKnot} onRemoveCustomKnot={removeCustomKnot} />}
     {activePage === "flytying" && <FlyTying customFlies={customFlies} onAddCustomFly={addCustomFly} onRemoveCustomFly={removeCustomFly} />}
     {activePage === "profile" && <Profile key={profile?.updated_at || user.id} profile={profile} user={user} onSaveProfile={saveProfile} />}
+    {activePage === "moderators" && isModerator && <ModeratorAdmin currentUser={user} />}
       </main>
 
       <nav className="bottomNav">

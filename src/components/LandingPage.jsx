@@ -8,7 +8,7 @@ function LandingPage({ catches = [], onEnterApp }) {
     { label: "About", sectionId: "about" },
     { label: "Contact", sectionId: "contact" },
   ]
-  const publicCatches = catches.filter((fish) => fish.is_public !== false)
+  const publicCatches = catches.filter((fish) => fish.is_public !== false && fish.moderation_status === "approved")
   const recentCatches = publicCatches.slice(0, 3)
   const fallbackCatches = [
     { id: "sample-1", species: "Largemouth Bass", location: "Crescent Bend Nature Park", fly: "Olive Woolly Bugger" },
