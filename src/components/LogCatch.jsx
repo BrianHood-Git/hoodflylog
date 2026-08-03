@@ -43,6 +43,10 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
       return
     }
 
+    if (analysis?.suggestions?.species && cleanedCatch.species) {
+      recordConfirmedSpecies(cleanedCatch.species)
+    }
+
     setFormData(createBlankCatchForm())
     setAnalysis(null)
     setAnalysisStatus("")
@@ -133,6 +137,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
           fly: formData.fly,
           water: formData.water,
         },
+        confirmedSpecies: getConfirmedSpecies(),
       }))
 
       const response = await fetch("/api/analyze-catch", {
@@ -206,7 +211,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
           <button type="button" className="aiAnalyzeBtn" onClick={analyzePhoto} disabled={!selectedPhoto || isAnalyzing}>
             {isAnalyzing ? "Analyzing photo..." : "✨ Analyze Photo + Conditions"}
           </button>
-          <small className="aiPrivacyNote">Uses your photo and, with permission, approximate GPS and current weather. Rounded GPS coordinates may be sent to iNaturalist to find fish observed nearby. AI suggestions may be wrong.</small>
+          <small className="aiPrivacyNote">Uses your photo and, with permission, approximate GPS and current weather. Rounded GPS coordinates may be sent to iNaturalist and GBIF to find fish observed nearby. AI suggestions may be wrong.</small>
           <label className="placeLookupConsent">
             <input type="checkbox" checked={allowPlaceLookup} onChange={(event) => {
               setAllowPlaceLookup(event.target.checked)
@@ -228,12 +233,16 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
             </div>
             <p>Species suggestion: {analysis.suggestions?.species || "No species identified"}</p>
             <p>Species confidence: {formatConfidence(analysis.suggestions?.confidence)}</p>
+            {analysis.suggestions?.identificationLevel === "candidate" && <p><strong>Best specific candidate:</strong> The vision model returned “{analysis.suggestions.promotedFromGroup}” broadly, so HoodFlyLog selected its first species-level alternative. Please confirm it before saving.</p>}
+            {analysis.suggestions?.identificationLevel === "group" && <p><strong>Broad identification only:</strong> The photo did not support a reliable species-level result. Confirm the exact fish before saving.</p>}
             {analysis.suggestions?.alternativeSpecies?.length > 0 && (
               <p>Other possibilities: {analysis.suggestions.alternativeSpecies.map((species, index) => (
                 <span key={species}>{index ? ", " : ""}<button type="button" className="speciesSuggestionBtn" onClick={() => updateField("species", species)}>{species}</button></span>
               ))}</p>
             )}
             {analysis.suggestions?.reasoning && <p>Why: {analysis.suggestions.reasoning}</p>}
+            {analysis.biodiversitySources?.length > 0 && <p>Nearby records checked: {analysis.biodiversitySources.join(" + ")}</p>}
+            {analysis.suggestions?.verificationUrl && <p><a href={analysis.suggestions.verificationUrl} target="_blank" rel="noreferrer">Check this name in FishBase ↗</a></p>}
             <p>All populated fields remain editable. Confirm the species and details before saving.</p>
           </div>
         )}
@@ -376,5 +385,26 @@ function recordAiUse() {
   localStorage.setItem("hoodflylog-ai-usage", JSON.stringify({ ...record, count: record.count + 1 }))
 }
 
+function getConfirmedSpecies() {
+  try {
+    const values = JSON.parse(localStorage.getItem("hoodflylog-confirmed-species") || "{}")
+    return Object.entries(values).sort((left, right) => right[1] - left[1]).slice(0, 12)
+      .map(([species, confirmations]) => ({ species, confirmations }))
+  } catch {
+    return []
+  }
+}
+
+function recordConfirmedSpecies(confirmedSpecies) {
+  const confirmed = confirmedSpecies.trim()
+  if (!confirmed) return
+  try {
+    const values = JSON.parse(localStorage.getItem("hoodflylog-confirmed-species") || "{}")
+    values[confirmed] = (Number(values[confirmed]) || 0) + 1
+    localStorage.setItem("hoodflylog-confirmed-species", JSON.stringify(values))
+  } catch {
+    // Identification feedback is optional; catch saving must still succeed.
+  }
+}
 export default LogCatch
 

@@ -7,6 +7,7 @@ import {
   normalizeSuggestions,
   normalizeFlyPatterns,
   getNearbyFishCandidates,
+  mergeFishCandidates,
   parseModelJson,
   rulesFallback,
 } from "./index.js"
@@ -40,6 +41,9 @@ test("normalizeSuggestions clamps confidence and limits values", () => {
     waterClarity: "CLEAR",
     visibleCharacteristics: ["dark lateral stripe"],
     reasoning: "Likely, but verify locally.",
+    identificationLevel: "species",
+    promotedFromGroup: "",
+    verificationUrl: "https://www.fishbase.se/ComNames/CommonNameSearchList.php?CommonName=Largemouth%20Bass",
   }, { existing: {} })
 
   assert.deepEqual(value, {
@@ -50,6 +54,9 @@ test("normalizeSuggestions clamps confidence and limits values", () => {
     waterClarity: "clear",
     visibleCharacteristics: ["dark lateral stripe"],
     reasoning: "Likely, but verify locally.",
+    identificationLevel: "species",
+    promotedFromGroup: "",
+    verificationUrl: "https://www.fishbase.se/ComNames/CommonNameSearchList.php?CommonName=Largemouth%20Bass",
   })
 })
 
@@ -59,6 +66,25 @@ test("normalizeSuggestions keeps missing confidence unavailable", () => {
   assert.deepEqual(value.alternativeSpecies, [])
 })
 
+test("normalizeSuggestions caps broad fish groups at low confidence", () => {
+  const value = normalizeSuggestions({ species: "Sunfish", confidence: 0.92 }, { existing: {} })
+  assert.equal(value.confidence, 0.45)
+  assert.equal(value.identificationLevel, "group")
+})
+
+test("normalizeSuggestions promotes a specific black bass alternative over a broad sunfish label", () => {
+  const value = normalizeSuggestions({
+    species: "sunfish",
+    confidence: 0.81,
+    alternativeSpecies: ["largemouth bass", "smallmouth bass", "spotted bass"],
+  }, { existing: {} })
+  assert.equal(value.species, "largemouth bass")
+  assert.equal(value.confidence, 0.45)
+  assert.equal(value.identificationLevel, "candidate")
+  assert.equal(value.promotedFromGroup, "sunfish")
+  assert.deepEqual(value.alternativeSpecies, ["sunfish", "smallmouth bass", "spotted bass"])
+  assert.doesNotMatch(value.reasoning, /orange-red spots/i)
+})
 test("normalizeSuggestions removes redundant alternatives and repeated reasoning", () => {
   const value = normalizeSuggestions({
     species: "Largemouth Bass",
@@ -106,31 +132,45 @@ test("Workers AI adapter sends Moondream query input and reads its answer", asyn
   assert.equal(result.text, '{"species":"Bluegill","confidence":0.75}')
 })
 
-test("iNaturalist candidate lookup rounds coordinates and normalizes species", async () => {
+test("multi-source candidate lookup rounds coordinates and normalizes species", async () => {
   const originalFetch = globalThis.fetch
-  let requestedUrl
+  const requestedUrls = []
   globalThis.fetch = async (url) => {
-    requestedUrl = String(url)
+    requestedUrls.push(String(url))
+    if (String(url).includes("api.gbif.org")) return Response.json({ results: [] })
     return Response.json({
       results: [{ count: 42, taxon: { preferred_common_name: "Bluegill", name: "Lepomis macrochirus" } }],
     })
   }
 
   try {
-    const candidates = await getNearbyFishCandidates(
+    const result = await getNearbyFishCandidates(
       { weather: { latitude: 29.61234, longitude: -98.34567 } },
       { waitUntil() {} },
     )
-    assert.match(requestedUrl, /lat=29.61/)
-    assert.match(requestedUrl, /lng=-98.35/)
-    assert.deepEqual(candidates, [{
+    const inaturalistUrl = requestedUrls.find((url) => url.includes("inaturalist"))
+    assert.match(inaturalistUrl, /lat=29.61/)
+    assert.match(inaturalistUrl, /lng=-98.35/)
+    assert.deepEqual(result, { candidates: [{
       commonName: "Bluegill",
       scientificName: "Lepomis macrochirus",
-      observationCount: 42,
-    }])
+      recordCount: 42,
+      sources: ["iNaturalist"],
+    }], sources: ["iNaturalist", "GBIF"] })
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test("mergeFishCandidates favors species supported by multiple databases", () => {
+  const candidates = mergeFishCandidates([
+    { commonName: "Largemouth Bass", scientificName: "Micropterus salmoides", recordCount: 5, sources: ["iNaturalist"] },
+    { commonName: "Largemouth Bass", scientificName: "Micropterus salmoides", recordCount: 1, sources: ["GBIF"] },
+    { commonName: "Bluegill", scientificName: "Lepomis macrochirus", recordCount: 20, sources: ["iNaturalist"] },
+  ])
+  assert.equal(candidates[0].commonName, "Largemouth Bass")
+  assert.deepEqual(candidates[0].sources, ["iNaturalist", "GBIF"])
+  assert.equal(candidates[0].recordCount, 6)
 })
 test("Workers AI adapter reads Cloudflare's nested result answer", async () => {
   const env = {
