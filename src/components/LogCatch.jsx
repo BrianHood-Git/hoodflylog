@@ -140,7 +140,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
         headers: { Authorization: `Bearer ${accessToken}` },
         body: requestBody,
       })
-      const result = await response.json()
+      const result = await readApiJson(response)
 
       if (!response.ok) throw new Error(result.error || "Photo analysis failed.")
 
@@ -206,7 +206,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
           <button type="button" className="aiAnalyzeBtn" onClick={analyzePhoto} disabled={!selectedPhoto || isAnalyzing}>
             {isAnalyzing ? "Analyzing photo..." : "✨ Analyze Photo + Conditions"}
           </button>
-          <small className="aiPrivacyNote">Uses your photo and, with permission, approximate GPS and current weather. AI suggestions may be wrong.</small>
+          <small className="aiPrivacyNote">Uses your photo and, with permission, approximate GPS and current weather. Rounded GPS coordinates may be sent to iNaturalist to find fish observed nearby. AI suggestions may be wrong.</small>
           <label className="placeLookupConsent">
             <input type="checkbox" checked={allowPlaceLookup} onChange={(event) => {
               setAllowPlaceLookup(event.target.checked)
@@ -228,6 +228,11 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
             </div>
             <p>Species suggestion: {analysis.suggestions?.species || "No species identified"}</p>
             <p>Species confidence: {formatConfidence(analysis.suggestions?.confidence)}</p>
+            {analysis.suggestions?.alternativeSpecies?.length > 0 && (
+              <p>Other possibilities: {analysis.suggestions.alternativeSpecies.map((species, index) => (
+                <span key={species}>{index ? ", " : ""}<button type="button" className="speciesSuggestionBtn" onClick={() => updateField("species", species)}>{species}</button></span>
+              ))}</p>
+            )}
             {analysis.suggestions?.reasoning && <p>Why: {analysis.suggestions.reasoning}</p>}
             <p>All populated fields remain editable. Confirm the species and details before saving.</p>
           </div>
@@ -317,6 +322,17 @@ function formatConfidence(value) {
   return `${Math.round(Math.max(0, Math.min(1, number)) * 100)}%`
 }
 
+async function readApiJson(response) {
+  const body = await response.text()
+  if (!body.trim()) {
+    throw new Error("The Catch Assistant API returned an empty response. Run npm run dev:worker for full local AI testing.")
+  }
+  try {
+    return JSON.parse(body)
+  } catch {
+    throw new Error("The Catch Assistant API was not available. Run npm run dev:worker instead of npm run dev for full local AI testing.")
+  }
+}
 async function prepareImageForAnalysis(file) {
   if (!file.type.startsWith("image/")) return file
   if (typeof createImageBitmap !== "function") return file
