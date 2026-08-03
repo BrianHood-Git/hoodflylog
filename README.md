@@ -234,6 +234,7 @@ First, enhance Log Catch so an uploaded photo plus GPS and weather can suggest c
 - The Worker never asks the model to infer a named location from coordinates or estimate length without a visible scale reference.
 - Local full-stack testing: `npm run dev:worker`.
 - To evaluate Hugging Face instead, set `AI_PROVIDER=huggingface`, `HF_MODEL`, and the encrypted `HF_TOKEN` Worker secret.
+- Use [`docs/ai-catch-assistant-qa.md`](docs/ai-catch-assistant-qa.md) for the live smoke test and same-photo provider comparison.
 
 ## Long-Term Ideas
 
