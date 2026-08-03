@@ -143,14 +143,15 @@ Current pages:
 ## Phase 7 - Fly Tying Library
 
 ### Planned
-- [ ] Woolly Bugger
-- [ ] Clouser Minnow
-- [ ] San Juan Worm
-- [ ] Pheasant Tail Nymph
-- [ ] Elk Hair Caddis
-- [ ] Materials lists
+- [x] Woolly Bugger
+- [x] Clouser Minnow
+- [x] San Juan Worm
+- [x] Pheasant Tail Nymph
+- [x] Elk Hair Caddis
+- [x] Materials lists
 - [ ] Step-by-step instructions
-- [ ] YouTube videos
+- [x] YouTube videos
+- [x] Searchable FlyPattern.org classic-pattern index with source attribution
 
 ---
 

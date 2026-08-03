@@ -5,11 +5,24 @@ import {
   buildPrompt,
   chooseGeoapifySuggestion,
   normalizeSuggestions,
+  normalizeFlyPatterns,
   getNearbyFishCandidates,
   parseModelJson,
   rulesFallback,
 } from "./index.js"
 
+test("normalizeFlyPatterns creates attributed source links and drops blank records", () => {
+  const patterns = normalizeFlyPatterns([
+    { title: "The Black and Yellow", authorName: "Francis Francis", authorSlug: "francis-francis", bookTitle: "A Book on Angling", bookSlug: "a-book-on-angling", slug: "the-black-and-yellow" },
+    { title: "" },
+  ])
+  assert.deepEqual(patterns, [{
+    title: "The Black and Yellow",
+    authorName: "Francis Francis",
+    bookTitle: "A Book on Angling",
+    url: "https://flypattern.org/authors/francis-francis/book/a-book-on-angling/pattern/the-black-and-yellow/",
+  }])
+})
 test("parseModelJson extracts fenced JSON", () => {
   const value = parseModelJson(`\`\`\`json
 {"species":"Bluegill","confidence":0.82}
