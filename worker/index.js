@@ -22,10 +22,53 @@ export default {
       }
       return suggestLocation(request, env, context)
     }
+    if (url.pathname === "/api/fly-patterns") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405)
+      return getFlyPatterns(context)
+    }
     return env.ASSETS.fetch(request)
   },
 }
 
+async function getFlyPatterns(context) {
+  const cacheKey = new Request("https://fly-patterns.internal/flypattern-org/v1")
+  const cache = globalThis.caches?.default
+  const cached = cache ? await cache.match(cacheKey) : null
+  if (cached) return cached
+
+  try {
+    const response = await fetch("https://flypattern.org/data/patterns.json", {
+      headers: { "User-Agent": "HoodFlyLog/1.0 (classic fly lookup)" },
+    })
+    if (!response.ok) throw new Error(`FlyPattern.org lookup failed (${response.status}).`)
+    const patterns = normalizeFlyPatterns(await response.json())
+    const result = Response.json({ patterns, source: "FlyPattern.org", license: "CC BY-NC-SA 4.0" }, {
+      headers: { "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" },
+    })
+    if (cache) context.waitUntil(cache.put(cacheKey, result.clone()))
+    return result
+  } catch (error) {
+    console.error("Classic fly-pattern lookup failed", error)
+    return json({ patterns: [], error: "Classic patterns are temporarily unavailable." }, 200)
+  }
+}
+
+function normalizeFlyPatterns(value) {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, 2500).map((pattern) => {
+    const authorSlug = cleanString(pattern?.authorSlug, 100)
+    const bookSlug = cleanString(pattern?.bookSlug, 140)
+    const slug = cleanString(pattern?.slug, 180)
+    return {
+      title: cleanString(pattern?.title, 160),
+      authorName: cleanString(pattern?.authorName, 120),
+      bookTitle: cleanString(pattern?.bookTitle, 180),
+      url: authorSlug && bookSlug && slug
+        ? `https://flypattern.org/authors/${authorSlug}/book/${bookSlug}/pattern/${slug}/`
+        : "https://flypattern.org/search/",
+    }
+  }).filter((pattern) => pattern.title)
+}
 async function suggestLocation(request, env, context) {
   const user = await authenticateUser(request, env)
   if (!user) return json({ error: "Sign in before requesting a location suggestion." }, 401)
@@ -475,6 +518,7 @@ export {
   buildPrompt,
   normalizeSuggestions,
   getNearbyFishCandidates,
+  normalizeFlyPatterns,
   parseModelJson,
   rulesFallback,
 }

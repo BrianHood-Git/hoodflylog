@@ -260,8 +260,12 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
     bestFor: "",
     materials: "",
     tip: "",
+    videoUrl: "",
   })
   const [message, setMessage] = useState("")
+  const [query, setQuery] = useState("")
+  const [classicPatterns, setClassicPatterns] = useState([])
+  const [classicStatus, setClassicStatus] = useState("Loading classic patterns...")
   const flies = [
     {
       name: "Woolly Bugger",
@@ -299,6 +303,15 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
       tip: "Floats well in broken water. Trim the wing clean and use floatant before fishing.",
     },
     {
+      name: "Silverman's Caddis Larva",
+      type: "Caddis larva nymph",
+      bestFor: "Trout in rivers and streams",
+      materials: "Suggested approximation: curved caddis/scud hook (#14–16), translucent olive-green segmented body, dark dubbed thorax, and sparse brown soft hackle",
+      tip: "Dead drift it below an indicator or as a dropper. Add an occasional subtle twitch when caddis larvae are active.",
+      sourceName: "Montana Fly Company pattern — reference from Red's Fly Shop",
+      sourceUrl: "https://redsflyfishing.com/products/silvermans-caddis-larva-by-montana-fly-company",
+    },
+    {
       name: "San Juan Worm",
       type: "Attractor nymph",
       bestFor: "Trout, carp, panfish",
@@ -321,19 +334,44 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
     },
   ]
   const flyLibrary = [...flies, ...customFlies]
+  const normalizedQuery = query.trim().toLowerCase()
+  const matchingFlies = flyLibrary.filter((fly) => !normalizedQuery || [fly.name, fly.type, fly.bestFor, fly.materials, fly.tip, fly.sourceName]
+    .some((value) => String(value || "").toLowerCase().includes(normalizedQuery)))
+  const matchingClassicPatterns = classicPatterns.filter((pattern) => !normalizedQuery || [pattern.title, pattern.authorName, pattern.bookTitle]
+    .some((value) => String(value || "").toLowerCase().includes(normalizedQuery)))
+  const displayedClassicPatterns = normalizedQuery ? matchingClassicPatterns.slice(0, 24) : []
+
+  useEffect(() => {
+    const controller = new AbortController()
+    async function loadClassicPatterns() {
+      try {
+        const response = await fetch("/api/fly-patterns", { signal: controller.signal })
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.error || "Classic patterns could not be loaded.")
+        setClassicPatterns(Array.isArray(payload.patterns) ? payload.patterns : [])
+        setClassicStatus(payload.patterns?.length ? "" : payload.error || "No classic patterns are available right now.")
+      } catch (error) {
+        if (error.name !== "AbortError") setClassicStatus("Classic patterns are temporarily unavailable. Your HoodFlyLog patterns still work.")
+      }
+    }
+    loadClassicPatterns()
+    return () => controller.abort()
+  }, [])
 
   function updateField(field, value) {
-    setFormData({
-      ...formData,
-      [field]: value,
-    })
+    setFormData((current) => ({ ...current, [field]: value }))
   }
 
   function addFly(event) {
     event.preventDefault()
-
     if (!formData.name.trim()) {
       setMessage("Add a fly name before saving.")
+      return
+    }
+
+    const videoUrl = normalizeYouTubeUrl(formData.videoUrl)
+    if (formData.videoUrl.trim() && !videoUrl) {
+      setMessage("Add a valid YouTube video or Shorts link.")
       return
     }
 
@@ -344,67 +382,123 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
       bestFor: formData.bestFor.trim() || "Your waters",
       materials: formData.materials.trim() || "Materials not listed yet.",
       tip: formData.tip.trim() || "Personal tying or fishing note.",
+      videoUrl,
       custom: true,
     })
 
-    setFormData({ name: "", type: "", bestFor: "", materials: "", tip: "" })
+    setFormData({ name: "", type: "", bestFor: "", materials: "", tip: "", videoUrl: "" })
     setMessage("Custom fly added.")
   }
 
   return (
     <div className="panel">
-      <h2>🪰 Fly Tying Library</h2>
+      <div className="sectionHeader compactHeader">
+        <div>
+          <p className="eyebrow">Patterns, recipes, and tutorials</p>
+          <h2>🪰 Fly Tying Library</h2>
+        </div>
+      </div>
+
+      <div className="flySearchPanel">
+        <label htmlFor="fly-pattern-search">Search flies, materials, species, authors, or books</label>
+        <div className="flySearchControls">
+          <input id="fly-pattern-search" type="search" placeholder="Try Woolly Bugger, bass, marabou, Kelson..." value={query} onChange={(event) => setQuery(event.target.value)} />
+          {query && <button className="secondaryBtn" type="button" onClick={() => setQuery("")}>Clear</button>}
+        </div>
+        <p>{normalizedQuery
+          ? `${matchingFlies.length} HoodFlyLog pattern${matchingFlies.length === 1 ? "" : "s"} · ${matchingClassicPatterns.length} FlyPattern.org match${matchingClassicPatterns.length === 1 ? "" : "es"}`
+          : `Searches ${flyLibrary.length} HoodFlyLog patterns and ${classicPatterns.length || "1,193"} classic FlyPattern.org records.`}</p>
+      </div>
+
+
+
+      <div className="sectionHeader flyLibraryHeading">
+        <div><p className="eyebrow">Modern and personal</p><h3>HoodFlyLog Patterns</h3></div>
+      </div>
+      {matchingFlies.length ? (
+        <div className="libraryGrid">
+          {matchingFlies.map((fly) => {
+            const videoId = getYouTubeVideoId(fly.videoUrl)
+            return (
+              <article className="libraryCard" key={fly.id || fly.name}>
+                <p className="eyebrow">{fly.type}</p>
+                <h3>{fly.name}</h3>
+                {fly.custom && <span className="customBadge">Custom</span>}
+                <p><strong>Best for:</strong> {fly.bestFor}</p>
+                <p><strong>Materials:</strong> {fly.materials}</p>
+                <p>{fly.tip}</p>
+                {fly.sourceUrl && <p className="libraryAttribution"><strong>Pattern source:</strong> <a href={fly.sourceUrl} target="_blank" rel="noreferrer">{fly.sourceName} ↗</a></p>}
+                {videoId && <iframe className="flyVideo" src={`https://www.youtube-nocookie.com/embed/${videoId}`} title={`${fly.name} tying tutorial`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />}
+                {fly.custom && <button className="textBtn" type="button" onClick={() => onRemoveCustomFly(fly.id)}>Remove</button>}
+              </article>
+            )
+          })}
+        </div>
+      ) : <p className="emptyState">No HoodFlyLog patterns match “{query}”.</p>}
+
+      <div className="sectionHeader flyLibraryHeading">
+        <div><p className="eyebrow">Historical reference</p><h3>Classic FlyPattern.org Index</h3></div>
+        <a className="secondaryBtn externalLibraryBtn" href="https://flypattern.org/search/" target="_blank" rel="noreferrer">Browse source ↗</a>
+      </div>
+      <p className="libraryAttribution">Classic pattern titles and source links are provided by <a href="https://flypattern.org/" target="_blank" rel="noreferrer">FlyPattern.org</a> under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noreferrer">CC BY-NC-SA 4.0</a>. Recipes open on the attributed source site.</p>
+      {classicStatus && <p className="formMessage">{classicStatus}</p>}
+      {displayedClassicPatterns.length > 0 && (
+        <div className="classicPatternList">
+          {displayedClassicPatterns.map((pattern) => (
+            <a key={pattern.url} className="classicPatternRow" href={pattern.url} target="_blank" rel="noreferrer">
+              <strong>{pattern.title}</strong>
+              <span>{pattern.authorName || "Unknown author"}{pattern.bookTitle ? ` · ${pattern.bookTitle}` : ""}</span>
+            </a>
+          ))}
+        </div>
+      )}
+      {normalizedQuery && matchingClassicPatterns.length > displayedClassicPatterns.length && <p className="libraryAttribution">Showing the first {displayedClassicPatterns.length} matches. Narrow the search to find a specific classic pattern.</p>}
+      {!classicStatus && !normalizedQuery && <p className="classicSearchPrompt">Enter a fly name, author, material, species, or source book above to search FlyPattern.org.</p>}
+      {!classicStatus && normalizedQuery && displayedClassicPatterns.length === 0 && <p className="classicSearchPrompt">No FlyPattern.org patterns match “{query}”. Try a broader pattern name or author.</p>}
       <form className="libraryForm" onSubmit={addFly}>
         <div className="sectionHeader compactHeader">
           <div>
-            <p className="eyebrow">Your patterns</p>
+            <p className="eyebrow">Saved on this device</p>
             <h3>Add a Custom Fly</h3>
           </div>
           <button className="heroBtn" type="submit">Save Fly</button>
         </div>
         <div className="libraryFormGrid">
-          <label>
-            Fly name
-            <input type="text" placeholder="Crescent Bend Bugger" value={formData.name} onChange={(event) => updateField("name", event.target.value)} />
-          </label>
-          <label>
-            Type
-            <input type="text" placeholder="Streamer, dry, nymph..." value={formData.type} onChange={(event) => updateField("type", event.target.value)} />
-          </label>
-          <label>
-            Best for
-            <input type="text" placeholder="Bass, panfish, trout..." value={formData.bestFor} onChange={(event) => updateField("bestFor", event.target.value)} />
-          </label>
-          <label>
-            Materials
-            <input type="text" placeholder="Hook, thread, body, tail..." value={formData.materials} onChange={(event) => updateField("materials", event.target.value)} />
-          </label>
-          <label className="fullWidth">
-            Tip
-            <textarea placeholder="Tying notes, colors, retrieve, where it works..." value={formData.tip} onChange={(event) => updateField("tip", event.target.value)} />
-          </label>
+          <label>Fly name<input type="text" placeholder="Crescent Bend Bugger" value={formData.name} onChange={(event) => updateField("name", event.target.value)} /></label>
+          <label>Type<input type="text" placeholder="Streamer, dry, nymph..." value={formData.type} onChange={(event) => updateField("type", event.target.value)} /></label>
+          <label>Best for<input type="text" placeholder="Bass, panfish, trout..." value={formData.bestFor} onChange={(event) => updateField("bestFor", event.target.value)} /></label>
+          <label>Materials<input type="text" placeholder="Hook, thread, body, tail..." value={formData.materials} onChange={(event) => updateField("materials", event.target.value)} /></label>
+          <label className="fullWidth">YouTube tutorial (optional)<input type="url" placeholder="https://www.youtube.com/watch?v=..." value={formData.videoUrl} onChange={(event) => updateField("videoUrl", event.target.value)} /></label>
+          <label className="fullWidth">Tip<textarea placeholder="Tying notes, colors, retrieve, where it works..." value={formData.tip} onChange={(event) => updateField("tip", event.target.value)} /></label>
         </div>
         {message && <p className="formMessage">{message}</p>}
       </form>
-      <div className="libraryGrid">
-        {flyLibrary.map((fly) => (
-          <article className="libraryCard" key={fly.id || fly.name}>
-            <p className="eyebrow">{fly.type}</p>
-            <h3>{fly.name}</h3>
-            {fly.custom && <span className="customBadge">Custom</span>}
-            <p><strong>Best for:</strong> {fly.bestFor}</p>
-            <p><strong>Materials:</strong> {fly.materials}</p>
-            <p>{fly.tip}</p>
-            {fly.custom && (
-              <button className="textBtn" type="button" onClick={() => onRemoveCustomFly(fly.id)}>Remove</button>
-            )}
-          </article>
-        ))}
-      </div>
     </div>
   )
-} 
+}
 
+function getYouTubeVideoId(value) {
+  if (!value) return ""
+  try {
+    const url = new URL(value)
+    const host = url.hostname.replace(/^www\./, "").toLowerCase()
+    let id = ""
+    if (host === "youtu.be") id = url.pathname.split("/").filter(Boolean)[0] || ""
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      id = url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/")
+        ? url.pathname.split("/").filter(Boolean)[1] || ""
+        : url.searchParams.get("v") || ""
+    }
+    return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : ""
+  } catch {
+    return ""
+  }
+}
+
+function normalizeYouTubeUrl(value) {
+  const id = getYouTubeVideoId(value.trim())
+  return id ? `https://www.youtube.com/watch?v=${id}` : ""
+}
 function Profile({ profile, user, onSaveProfile }) {
   const [formData, setFormData] = useState(() => ({
     display_name: profile?.display_name || "",

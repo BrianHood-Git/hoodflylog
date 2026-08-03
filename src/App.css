@@ -1186,3 +1186,139 @@ h3 {
   text-decoration: underline;
   cursor: pointer;
 }
+.flySearchPanel {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #c6d9a2;
+  border-radius: 12px;
+  background: #eef4dc;
+}
+
+.flySearchPanel label {
+  color: #153e27;
+  font-weight: 900;
+}
+
+.flySearchPanel input {
+  width: 100%;
+  border: 1px solid #b7ca91;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #061f14;
+  padding: 12px 13px;
+  font: inherit;
+}
+
+.flySearchPanel p,
+.libraryAttribution {
+  margin: 0;
+  color: #5d503e;
+  line-height: 1.45;
+}
+
+.flyLibraryHeading {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.flyVideo {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #061f14;
+}
+
+.externalLibraryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 13px;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.libraryAttribution a {
+  color: #185734;
+  font-weight: 800;
+}
+
+.classicPatternList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.classicPatternRow {
+  display: grid;
+  gap: 5px;
+  padding: 13px;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #f6ecd9;
+  color: #153e27;
+  text-decoration: none;
+}
+
+.classicPatternRow:hover,
+.classicPatternRow:focus-visible {
+  border-color: #8ba45c;
+  background: #eef4dc;
+}
+
+.classicPatternRow span {
+  color: #6d604c;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 720px) {
+  .classicPatternList {
+    grid-template-columns: 1fr;
+  }
+
+  .flyLibraryHeading {
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+.flySearchControls {
+  display: flex;
+  gap: 8px;
+}
+
+.flySearchControls input {
+  flex: 1;
+}
+
+.flySearchControls button {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  border: 1px solid #b7ca91;
+  border-radius: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.classicSearchPrompt {
+  margin: 14px 0 0;
+  padding: 18px;
+  border: 1px dashed #cdb98f;
+  border-radius: 10px;
+  background: #fbf4e8;
+  color: #6d604c;
+  text-align: center;
+  line-height: 1.45;
+}
+
+@media (max-width: 520px) {
+  .flySearchControls {
+    align-items: stretch;
+  }
+}
