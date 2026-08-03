@@ -2,6 +2,8 @@ const WORKERS_VISION_MODEL = "@cf/moondream/moondream3.1-9B-A2B"
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const DAILY_REQUEST_LIMIT = 10
 const DAILY_LOCATION_LIMIT = 50
+const INATURALIST_RADIUS_KM = 75
+const INATURALIST_CANDIDATE_LIMIT = 15
 
 export default {
   async fetch(request, env, context) {
@@ -161,6 +163,7 @@ async function analyzeCatch(request, env, context) {
     if (photo.size > MAX_IMAGE_BYTES) return json({ error: "Photo must be smaller than 5 MB." }, 413)
 
     const contextData = parseContext(form.get("context"))
+    contextData.nearbySpecies = await getNearbyFishCandidates(contextData, context)
     const bytes = new Uint8Array(await photo.arrayBuffer())
     const provider = (env.AI_PROVIDER || "workers-ai").toLowerCase()
 
@@ -206,7 +209,11 @@ async function analyzeWithWorkersAi(bytes, mimeType, contextData, env) {
 
   return {
     model: WORKERS_VISION_MODEL,
-    text: response.answer || response.response || response.description || JSON.stringify(response),
+    text: response.answer
+      || response.result?.answer
+      || response.response
+      || response.description
+      || JSON.stringify(response),
   }
 }
 
@@ -253,6 +260,7 @@ Return only valid JSON with this exact shape:
 {
   "species": "likely common name or empty string",
   "confidence": 0.72,
+  "alternativeSpecies": ["up to three other plausible common names"],
   "fly": "fly/lure only if clearly visible, otherwise empty string",
   "waterClarity": "clear, stained, muddy, or empty string",
   "visibleCharacteristics": ["short factual visual observation"],
@@ -260,24 +268,50 @@ Return only valid JSON with this exact shape:
 }
 Confidence must be a JSON number from 0 to 1 that reflects actual certainty, or null when no fish is identifiable.
 GPS and live weather are context, not visual evidence of species. Never invent a named location from coordinates.
+When nearbySpecies is present, use it only as a location-based shortlist. Compare the visible fish against those candidates, but choose a species outside the list when the visual evidence supports it. Do not identify a fish solely because it is common nearby.
 Context: ${JSON.stringify(contextData)}`
 }
 
 function normalizeSuggestions(value, contextData) {
+  const species = cleanString(value.species, 80)
   const hasConfidence = value.confidence !== null && value.confidence !== undefined && value.confidence !== ""
   const confidence = hasConfidence ? Number(value.confidence) : Number.NaN
   return {
-    species: cleanString(value.species, 80),
+    species,
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+    alternativeSpecies: normalizeAlternativeSpecies(value.alternativeSpecies, species),
     fly: cleanString(value.fly, 100),
     waterClarity: normalizeClarity(value.waterClarity || contextData.existing?.water),
     visibleCharacteristics: Array.isArray(value.visibleCharacteristics)
       ? value.visibleCharacteristics.slice(0, 6).map((item) => cleanString(item, 140)).filter(Boolean)
       : [],
-    reasoning: cleanString(value.reasoning, 500),
+    reasoning: cleanReasoning(value.reasoning),
   }
 }
 
+function normalizeAlternativeSpecies(value, primarySpecies) {
+  if (!Array.isArray(value)) return []
+  const primary = primarySpecies.toLowerCase()
+  const seen = new Set()
+  return value.map((item) => cleanString(item, 80)).filter((item) => {
+    const normalized = item.toLowerCase()
+    if (!normalized || seen.has(normalized) || primary.includes(normalized) || normalized.includes(primary)) return false
+    seen.add(normalized)
+    return true
+  }).slice(0, 3)
+}
+
+function cleanReasoning(value) {
+  const reasoning = cleanString(value, 800)
+  if (!reasoning) return ""
+  const seen = new Set()
+  return reasoning.split(/(?<=[.!?])\s+/).filter((sentence) => {
+    const normalized = sentence.toLowerCase().replace(/\W+/g, " ").trim()
+    if (!normalized || seen.has(normalized)) return false
+    seen.add(normalized)
+    return true
+  }).slice(0, 2).join(" ").slice(0, 360)
+}
 function rulesFallback(contextData, reason) {
   return {
     provider: "rules",
@@ -285,6 +319,7 @@ function rulesFallback(contextData, reason) {
     suggestions: {
       species: "",
       confidence: null,
+      alternativeSpecies: [],
       fly: contextData.existing?.fly || "",
       waterClarity: normalizeClarity(contextData.existing?.water),
       visibleCharacteristics: [],
@@ -293,6 +328,53 @@ function rulesFallback(contextData, reason) {
   }
 }
 
+async function getNearbyFishCandidates(contextData, context) {
+  const latitude = Number(contextData.weather?.latitude)
+  const longitude = Number(contextData.weather?.longitude)
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+    || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return []
+
+  const roundedLatitude = Number(latitude.toFixed(2))
+  const roundedLongitude = Number(longitude.toFixed(2))
+  const cacheKey = new Request(`https://fish-candidates.internal/inaturalist/${roundedLatitude}/${roundedLongitude}`)
+  const cache = globalThis.caches?.default
+  const cached = cache ? await cache.match(cacheKey) : null
+  if (cached) return cached.json()
+
+  try {
+    const params = new URLSearchParams({
+      lat: String(roundedLatitude),
+      lng: String(roundedLongitude),
+      radius: String(INATURALIST_RADIUS_KM),
+      iconic_taxa: "Actinopterygii",
+      quality_grade: "research",
+      rank: "species",
+      per_page: String(INATURALIST_CANDIDATE_LIMIT),
+      locale: "en",
+    })
+    const response = await fetch(`https://api.inaturalist.org/v1/observations/species_counts?${params}`, {
+      headers: { "User-Agent": "HoodFlyLog/1.0 (nearby fish suggestions)" },
+    })
+    if (!response.ok) throw new Error(`iNaturalist lookup failed (${response.status}).`)
+
+    const payload = await response.json()
+    const candidates = (payload?.results || []).map((entry) => ({
+      commonName: cleanString(entry?.taxon?.preferred_common_name, 80),
+      scientificName: cleanString(entry?.taxon?.name, 100),
+      observationCount: Math.max(0, Number(entry?.count) || 0),
+    })).filter((candidate) => candidate.commonName || candidate.scientificName)
+
+    if (cache) {
+      context.waitUntil(cache.put(cacheKey, new Response(JSON.stringify(candidates), {
+        headers: { "Cache-Control": "public, max-age=604800", "Content-Type": "application/json" },
+      })))
+    }
+    return candidates
+  } catch (error) {
+    console.error("iNaturalist nearby-species lookup failed", error)
+    return []
+  }
+}
 async function authenticateUser(request, env) {
   const authorization = request.headers.get("Authorization")
   if (!authorization?.startsWith("Bearer ") || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return null
@@ -392,6 +474,7 @@ export {
   chooseGeoapifySuggestion,
   buildPrompt,
   normalizeSuggestions,
+  getNearbyFishCandidates,
   parseModelJson,
   rulesFallback,
 }

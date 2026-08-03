@@ -5,6 +5,7 @@ import {
   buildPrompt,
   chooseGeoapifySuggestion,
   normalizeSuggestions,
+  getNearbyFishCandidates,
   parseModelJson,
   rulesFallback,
 } from "./index.js"
@@ -21,6 +22,7 @@ test("normalizeSuggestions clamps confidence and limits values", () => {
   const value = normalizeSuggestions({
     species: "  Largemouth Bass  ",
     confidence: 2,
+    alternativeSpecies: ["Bluegill", "Redear Sunfish", "Bluegill", "Warmouth"],
     fly: "Woolly Bugger",
     waterClarity: "CLEAR",
     visibleCharacteristics: ["dark lateral stripe"],
@@ -30,6 +32,7 @@ test("normalizeSuggestions clamps confidence and limits values", () => {
   assert.deepEqual(value, {
     species: "Largemouth Bass",
     confidence: 1,
+    alternativeSpecies: ["Bluegill", "Redear Sunfish", "Warmouth"],
     fly: "Woolly Bugger",
     waterClarity: "clear",
     visibleCharacteristics: ["dark lateral stripe"],
@@ -40,13 +43,24 @@ test("normalizeSuggestions clamps confidence and limits values", () => {
 test("normalizeSuggestions keeps missing confidence unavailable", () => {
   const value = normalizeSuggestions({ species: "Sunfish", confidence: null }, { existing: {} })
   assert.equal(value.confidence, null)
+  assert.deepEqual(value.alternativeSpecies, [])
 })
 
+test("normalizeSuggestions removes redundant alternatives and repeated reasoning", () => {
+  const value = normalizeSuggestions({
+    species: "Largemouth Bass",
+    alternativeSpecies: ["bass", "Sunfish", "sunfish", "Largemouth Bass"],
+    reasoning: "Dark lateral stripe is visible. Dark lateral stripe is visible. Mouth shape supports bass. Extra repetition.",
+  }, { existing: {} })
+  assert.deepEqual(value.alternativeSpecies, ["Sunfish"])
+  assert.equal(value.reasoning, "Dark lateral stripe is visible. Mouth shape supports bass.")
+})
 test("buildPrompt prohibits unsupported location and length claims", () => {
   const prompt = buildPrompt({ weather: { latitude: 29.4, longitude: -98.5 } })
   assert.match(prompt, /do not estimate fish length/i)
   assert.match(prompt, /Never invent a named location/i)
   assert.match(prompt, /Do not leave species blank merely because identification is uncertain/i)
+  assert.match(prompt, /location-based shortlist/i)
 })
 
 test("rulesFallback preserves entered context without inventing species", () => {
@@ -79,6 +93,42 @@ test("Workers AI adapter sends Moondream query input and reads its answer", asyn
   assert.equal(result.text, '{"species":"Bluegill","confidence":0.75}')
 })
 
+test("iNaturalist candidate lookup rounds coordinates and normalizes species", async () => {
+  const originalFetch = globalThis.fetch
+  let requestedUrl
+  globalThis.fetch = async (url) => {
+    requestedUrl = String(url)
+    return Response.json({
+      results: [{ count: 42, taxon: { preferred_common_name: "Bluegill", name: "Lepomis macrochirus" } }],
+    })
+  }
+
+  try {
+    const candidates = await getNearbyFishCandidates(
+      { weather: { latitude: 29.61234, longitude: -98.34567 } },
+      { waitUntil() {} },
+    )
+    assert.match(requestedUrl, /lat=29.61/)
+    assert.match(requestedUrl, /lng=-98.35/)
+    assert.deepEqual(candidates, [{
+      commonName: "Bluegill",
+      scientificName: "Lepomis macrochirus",
+      observationCount: 42,
+    }])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+test("Workers AI adapter reads Cloudflare's nested result answer", async () => {
+  const env = {
+    AI: {
+      run: async () => ({ result: { answer: '{"species":"Bass","confidence":0.72}' } }),
+    },
+  }
+
+  const result = await analyzeWithWorkersAi(new Uint8Array([255, 216, 255]), "image/jpeg", { existing: {} }, env)
+  assert.equal(result.text, '{"species":"Bass","confidence":0.72}')
+})
 test("Geoapify selector prefers the nearest named park or water feature", () => {
   const value = chooseGeoapifySuggestion({
     features: [
