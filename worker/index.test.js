@@ -37,10 +37,16 @@ test("normalizeSuggestions clamps confidence and limits values", () => {
   })
 })
 
+test("normalizeSuggestions keeps missing confidence unavailable", () => {
+  const value = normalizeSuggestions({ species: "Sunfish", confidence: null }, { existing: {} })
+  assert.equal(value.confidence, null)
+})
+
 test("buildPrompt prohibits unsupported location and length claims", () => {
   const prompt = buildPrompt({ weather: { latitude: 29.4, longitude: -98.5 } })
   assert.match(prompt, /do not estimate fish length/i)
   assert.match(prompt, /Never invent a named location/i)
+  assert.match(prompt, /Do not leave species blank merely because identification is uncertain/i)
 })
 
 test("rulesFallback preserves entered context without inventing species", () => {

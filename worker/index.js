@@ -247,22 +247,25 @@ async function analyzeWithHuggingFace(bytes, mimeType, contextData, env) {
 }
 
 function buildPrompt(contextData) {
-  return `Analyze this fishing catch photo cautiously. Do not claim certainty and do not estimate fish length without a visible scale reference.
+  return `Analyze this fishing catch photo as a fish-identification assistant. First determine whether a fish is visible. If a fish is visible, make the best cautious common-species identification from body shape, mouth, fins, coloration, and markings. Do not leave species blank merely because identification is uncertain; use a broader common group such as "sunfish" or "bass" when that is the most defensible identification. Leave species blank only when no fish is visible or the image provides no usable fish characteristics.
+Do not claim certainty and do not estimate fish length without a visible scale reference.
 Return only valid JSON with this exact shape:
 {
   "species": "likely common name or empty string",
-  "confidence": 0.0,
+  "confidence": 0.72,
   "fly": "fly/lure only if clearly visible, otherwise empty string",
   "waterClarity": "clear, stained, muddy, or empty string",
   "visibleCharacteristics": ["short factual visual observation"],
   "reasoning": "one short explanation including uncertainty"
 }
+Confidence must be a JSON number from 0 to 1 that reflects actual certainty, or null when no fish is identifiable.
 GPS and live weather are context, not visual evidence of species. Never invent a named location from coordinates.
 Context: ${JSON.stringify(contextData)}`
 }
 
 function normalizeSuggestions(value, contextData) {
-  const confidence = Number(value.confidence)
+  const hasConfidence = value.confidence !== null && value.confidence !== undefined && value.confidence !== ""
+  const confidence = hasConfidence ? Number(value.confidence) : Number.NaN
   return {
     species: cleanString(value.species, 80),
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
