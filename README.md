@@ -186,12 +186,61 @@ Current pages:
 - [ ] Shared fishing reports
 
 ---
+## Phase 11 - Smart Fly Advisor (Next Priority)
+
+### Goal
+First, enhance Log Catch so an uploaded photo plus GPS and weather can suggest catch details while keeping every value editable. Then use those conditions to recommend practical flies, colors, sizes, and presentations.
+
+
+### Planned
+- [x] Add an Analyze Photo action to the Log Catch workflow
+- [x] Analyze the uploaded photo for likely fish species and visible characteristics
+- [x] Combine photo analysis with permission-based GPS instead of guessing location from the image
+- [x] Load current weather and conditions for the captured GPS coordinates
+- [x] Suggest useful catch fields such as species, location, weather notes, and confidence
+- [x] Show which values were suggested by AI
+- [x] Keep every suggested field editable before the angler saves the catch
+- [x] Preserve manual entry when photo analysis is skipped or unavailable
+- [ ] Compare Hugging Face vision models with Cloudflare Workers AI
+- [x] Optimize for low-volume friends-and-family usage and minimal cost
+- [x] Capture GPS coordinates with user permission
+- [x] Load current weather for the selected location
+- [x] Ask for water clarity: clear, stained, or muddy
+- [ ] Ask for target species and water type
+- [ ] Build a curated rules-based fly recommendation engine
+- [ ] Evaluate Hugging Face models and inference providers
+- [ ] Use Hugging Face to rank and explain rule-selected flies
+- [ ] Return three recommendations with fly, size, color, presentation, and reasoning
+- [ ] Cache recommendations by approximate location and conditions
+- [x] Add per-user AI usage limits to control cost
+- [x] Fall back to rules-only recommendations when AI is unavailable
+- [x] Label results as AI-enhanced or rules-only
+- [x] Keep all provider credentials in encrypted server-side secrets
+- [ ] Test recommendation quality against real catch history
+
+### Provider strategy
+- Primary candidate: Hugging Face
+- Alternative: Cloudflare Workers AI
+- Local development option: LM Studio
+- Required fallback: curated rules engine
+
+---
+### Catch Assistant implementation notes
+- The live default is Cloudflare Workers AI using `@cf/meta/llama-3.2-11b-vision-instruct`.
+- The endpoint requires a valid HoodFlyLog Supabase session and accepts images up to 5 MB.
+- Each account is limited to 10 server-side analysis attempts per UTC day; the browser also limits normal use to 5.
+- Photos and optional GPS/weather context are sent only when the angler presses **Analyze Photo + Conditions**.
+- AI suggestions are never saved automatically. Every populated field remains editable and the user must press **Save Catch**.
+- The Worker never asks the model to infer a named location from coordinates or estimate length without a visible scale reference.
+- Local full-stack testing: `npm run dev:worker`.
+- Before first Workers AI use, accept the Meta Llama 3.2 license as described in the [Cloudflare model documentation](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/).
+- To evaluate Hugging Face instead, set `AI_PROVIDER=huggingface`, `HF_MODEL`, and the encrypted `HF_TOKEN` Worker secret.
 
 ## Long-Term Ideas
 
 - [ ] Moon phase tracking
 - [ ] Fish species database
-- [ ] Fly recommendations
+- [ ] Expand Smart Fly Advisor with personalized fly recommendations
 - [ ] River flow data
 - [ ] Water level monitoring
 - [ ] Fishing forecast system
