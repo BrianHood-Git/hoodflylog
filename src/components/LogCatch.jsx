@@ -11,6 +11,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
   const [weatherStatus, setWeatherStatus] = useState("")
   const [analysisStatus, setAnalysisStatus] = useState("")
   const [analysis, setAnalysis] = useState(null)
+  const [allowPlaceLookup, setAllowPlaceLookup] = useState(false)
 
   function updateField(field, value) {
     setFormData((current) => ({ ...current, [field]: value }))
@@ -59,15 +60,21 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
       const latitude = Number(position.coords.latitude.toFixed(5))
       const longitude = Number(position.coords.longitude.toFixed(5))
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,pressure_msl,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`
-      const response = await fetch(weatherUrl)
+      const placeUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+      const [response, placeResponse] = await Promise.all([
+        fetch(weatherUrl),
+        allowPlaceLookup ? fetch(placeUrl).catch(() => null) : Promise.resolve(null),
+      ])
 
       if (!response.ok) throw new Error("Weather request failed")
 
       const weather = await response.json()
+      const place = placeResponse?.ok ? await placeResponse.json() : null
       const current = weather.current || {}
       const context = {
         latitude,
         longitude,
+        placeName: formatPlaceName(place),
         timezone: weather.timezone || "",
         temperatureF: current.temperature_2m ?? null,
         windMph: current.wind_speed_10m ?? null,
@@ -80,7 +87,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
       if (applyToForm) {
         setFormData((currentForm) => ({
           ...currentForm,
-          location: currentForm.location || `${latitude}, ${longitude}`,
+          location: currentForm.location || context.placeName || `${latitude}, ${longitude}`,
           notes: appendUniqueNote(currentForm.notes, weatherNote),
         }))
       }
@@ -164,7 +171,7 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
     setFormData((current) => ({
       ...current,
       species: current.species || suggestions.species,
-      location: current.location || (weather ? `${weather.latitude}, ${weather.longitude}` : ""),
+      location: current.location || (weather ? weather.placeName || `${weather.latitude}, ${weather.longitude}` : ""),
       fly: current.fly || suggestions.fly,
       water: current.water || suggestions.waterClarity,
       notes: appendUniqueNote(current.notes, aiNote),
@@ -198,6 +205,10 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
             {isAnalyzing ? "Analyzing photo..." : "✨ Analyze Photo + Conditions"}
           </button>
           <small className="aiPrivacyNote">Uses your photo and, with permission, approximate GPS and current weather. AI suggestions may be wrong.</small>
+          <label className="placeLookupConsent">
+            <input type="checkbox" checked={allowPlaceLookup} onChange={(event) => setAllowPlaceLookup(event.target.checked)} />
+            Suggest a nearby place name by sending GPS coordinates to BigDataCloud
+          </label>
         </div>
 
         {analysisStatus && <p className="formMessage fullWidth" role="status">{analysisStatus}</p>}
@@ -261,11 +272,18 @@ function getCurrentPosition() {
   })
 }
 
+function formatPlaceName(place) {
+  if (!place) return ""
+  const locality = place.locality || place.city || place.localityInfo?.administrative?.[0]?.name || ""
+  return [...new Set([locality, place.principalSubdivision, place.countryName].filter(Boolean))].join(", ")
+}
+
 function formatWeatherNote(weather) {
   return [
+    weather.placeName ? `Nearby place: ${weather.placeName}` : "",
     `GPS: ${weather.latitude}, ${weather.longitude}`,
     `Weather: ${weather.temperatureF ?? "?"}F, wind ${weather.windMph ?? "?"} mph, humidity ${weather.humidityPercent ?? "?"}%, pressure ${weather.pressureHpa ?? "?"} hPa`,
-  ].join("\n")
+  ].filter(Boolean).join("\n")
 }
 
 function appendUniqueNote(current, addition) {

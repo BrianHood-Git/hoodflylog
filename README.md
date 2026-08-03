@@ -195,7 +195,7 @@ First, enhance Log Catch so an uploaded photo plus GPS and weather can suggest c
 ### Planned
 - [x] Add an Analyze Photo action to the Log Catch workflow
 - [x] Analyze the uploaded photo for likely fish species and visible characteristics
-- [x] Combine photo analysis with permission-based GPS instead of guessing location from the image
+- [x] Combine photo analysis with permission-based GPS and an optional nearby place name instead of guessing location from the image
 - [x] Load current weather and conditions for the captured GPS coordinates
 - [x] Suggest useful catch fields such as species, location, weather notes, and confidence
 - [x] Show which values were suggested by AI
@@ -229,7 +229,7 @@ First, enhance Log Catch so an uploaded photo plus GPS and weather can suggest c
 - The live default is Cloudflare Workers AI using `@cf/meta/llama-3.2-11b-vision-instruct`.
 - The endpoint requires a valid HoodFlyLog Supabase session and accepts images up to 5 MB.
 - Each account is limited to 10 server-side analysis attempts per UTC day; the browser also limits normal use to 5.
-- Photos and optional GPS/weather context are sent only when the angler presses **Analyze Photo + Conditions**.
+- Photos and optional GPS/weather context are sent only when the angler presses **Analyze Photo + Conditions**. A separate, default-off checkbox is required before coordinates are sent to BigDataCloud for a nearby place-name suggestion.
 - AI suggestions are never saved automatically. Every populated field remains editable and the user must press **Save Catch**.
 - The Worker never asks the model to infer a named location from coordinates or estimate length without a visible scale reference.
 - Local full-stack testing: `npm run dev:worker`.
