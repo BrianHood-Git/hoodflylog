@@ -1,4 +1,4 @@
-const WORKERS_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+const WORKERS_VISION_MODEL = "@cf/moondream/moondream3.1-9B-A2B"
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const DAILY_REQUEST_LIMIT = 10
 
@@ -42,7 +42,7 @@ async function analyzeCatch(request, env, context) {
       if (provider === "huggingface") {
         result = await analyzeWithHuggingFace(bytes, photo.type, contextData, env)
       } else if (env.AI) {
-        result = await analyzeWithWorkersAi(bytes, contextData, env)
+        result = await analyzeWithWorkersAi(bytes, photo.type, contextData, env)
       } else {
         return json({ ...rulesFallback(contextData, "Workers AI is not configured."), remainingToday: rateLimit.remaining }, 200)
       }
@@ -66,18 +66,20 @@ async function analyzeCatch(request, env, context) {
   }
 }
 
-async function analyzeWithWorkersAi(bytes, contextData, env) {
-  const prompt = buildPrompt(contextData)
+async function analyzeWithWorkersAi(bytes, mimeType, contextData, env) {
   const response = await env.AI.run(WORKERS_VISION_MODEL, {
-    prompt,
-    image: Array.from(bytes),
+    task: "query",
+    image: `data:${mimeType};base64,${bytesToBase64(bytes)}`,
+    question: buildPrompt(contextData),
+    reasoning: false,
+    stream: false,
     max_tokens: 500,
     temperature: 0.2,
   })
 
   return {
     model: WORKERS_VISION_MODEL,
-    text: response.response || response.description || JSON.stringify(response),
+    text: response.answer || response.response || response.description || JSON.stringify(response),
   }
 }
 
@@ -239,9 +241,6 @@ async function sha256(value) {
 
 function safeErrorMessage(error) {
   const message = error instanceof Error ? error.message : "Catch analysis failed."
-  if (/license|agree/i.test(message)) {
-    return "Workers AI vision model license must be accepted in Cloudflare before first use."
-  }
   return message.slice(0, 240)
 }
 
@@ -256,6 +255,7 @@ function json(payload, status = 200) {
 }
 
 export {
+  analyzeWithWorkersAi,
   buildPrompt,
   normalizeSuggestions,
   parseModelJson,

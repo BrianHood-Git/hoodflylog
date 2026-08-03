@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
+  analyzeWithWorkersAi,
   buildPrompt,
   normalizeSuggestions,
   parseModelJson,
@@ -49,3 +50,24 @@ test("rulesFallback preserves entered context without inventing species", () => 
   assert.equal(result.suggestions.waterClarity, "stained")
 })
 
+
+test("Workers AI adapter sends Moondream query input and reads its answer", async () => {
+  let request
+  const env = {
+    AI: {
+      run: async (model, input) => {
+        request = { model, input }
+        return { answer: '{"species":"Bluegill","confidence":0.75}' }
+      },
+    },
+  }
+
+  const result = await analyzeWithWorkersAi(new Uint8Array([255, 216, 255]), "image/jpeg", { existing: {} }, env)
+
+  assert.equal(request.model, "@cf/moondream/moondream3.1-9B-A2B")
+  assert.equal(request.input.task, "query")
+  assert.equal(request.input.stream, false)
+  assert.match(request.input.image, /^data:image\/jpeg;base64,/)
+  assert.match(request.input.question, /Return only valid JSON/)
+  assert.equal(result.text, '{"species":"Bluegill","confidence":0.75}')
+})

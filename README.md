@@ -219,21 +219,20 @@ First, enhance Log Catch so an uploaded photo plus GPS and weather can suggest c
 - [ ] Test recommendation quality against real catch history
 
 ### Provider strategy
-- Primary candidate: Hugging Face
-- Alternative: Cloudflare Workers AI
+- Initial hosted provider: Cloudflare Workers AI
+- Comparison provider: Hugging Face
 - Local development option: LM Studio
 - Required fallback: curated rules engine
 
 ---
 ### Catch Assistant implementation notes
-- The live default is Cloudflare Workers AI using `@cf/meta/llama-3.2-11b-vision-instruct`.
+- The hosted default is Cloudflare Workers AI using `@cf/moondream/moondream3.1-9B-A2B`, selected for efficient structured vision analysis without the separate Meta model-acceptance step.
 - The endpoint requires a valid HoodFlyLog Supabase session and accepts images up to 5 MB.
 - Each account is limited to 10 server-side analysis attempts per UTC day; the browser also limits normal use to 5.
 - Photos and optional GPS/weather context are sent only when the angler presses **Analyze Photo + Conditions**. A separate, default-off checkbox is required before coordinates are sent to BigDataCloud for a nearby place-name suggestion.
 - AI suggestions are never saved automatically. Every populated field remains editable and the user must press **Save Catch**.
 - The Worker never asks the model to infer a named location from coordinates or estimate length without a visible scale reference.
 - Local full-stack testing: `npm run dev:worker`.
-- Before first Workers AI use, accept the Meta Llama 3.2 license as described in the [Cloudflare model documentation](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/).
 - To evaluate Hugging Face instead, set `AI_PROVIDER=huggingface`, `HF_MODEL`, and the encrypted `HF_TOKEN` Worker secret.
 
 ## Long-Term Ideas
