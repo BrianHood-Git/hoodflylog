@@ -149,7 +149,9 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
       setAnalysis(result)
       setAnalysisStatus(result.provider === "rules"
         ? "AI was unavailable, so GPS/weather context was applied. Review and finish the fields."
-        : "Suggestions applied. Review every field and correct anything before saving.")
+        : result.suggestions?.species
+          ? "Fish suggestions applied. Review every field and correct anything before saving."
+          : "AI analyzed the photo but could not identify the fish. Try a clearer side-profile photo or enter the species manually.")
     } catch (error) {
       console.error(error)
       setAnalysisStatus(error.message || "Photo analysis failed. You can still enter the catch manually.")
@@ -224,7 +226,9 @@ function LogCatch({ onSaveCatch, selectedPhoto, onOpenCamera, onChoosePhoto }) {
               <span className="customBadge">{analysis.provider === "rules" ? "Rules only" : "AI enhanced"}</span>
               <strong>Catch Assistant suggestions</strong>
             </div>
+            <p>Species suggestion: {analysis.suggestions?.species || "No species identified"}</p>
             <p>Species confidence: {formatConfidence(analysis.suggestions?.confidence)}</p>
+            {analysis.suggestions?.reasoning && <p>Why: {analysis.suggestions.reasoning}</p>}
             <p>All populated fields remain editable. Confirm the species and details before saving.</p>
           </div>
         )}
@@ -307,6 +311,7 @@ function appendUniqueNote(current, addition) {
 }
 
 function formatConfidence(value) {
+  if (value === null || value === undefined || value === "") return "Not available"
   const number = Number(value)
   if (!Number.isFinite(number)) return "Not available"
   return `${Math.round(Math.max(0, Math.min(1, number)) * 100)}%`
