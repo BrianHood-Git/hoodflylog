@@ -327,7 +327,8 @@ async function analyzeFlyWithWorkersAi(bytes, mimeType, knownPatterns, env) {
 }
 
 function buildFlyVisionPrompt() {
-  return `Inspect this image as a fly-fishing expert. First decide whether it clearly contains a tied fishing fly. Describe only what is visibly present: overall fly family, hook profile, foam, bead or weight, tail, body, rib, thorax, hackle, wing, rubber legs, colors, proportions, and orientation. Suggest up to three established pattern names only when supported by those features. Pay special attention to foam terrestrials such as Chubby Chernobyl, Stubby Chubby, hopper, stonefly, and ant patterns. Do not output JSON and do not provide tying instructions.`
+  return `Inspect this fishing-hook image without assuming it is a fly or any particular pattern. Classify the construction before naming it. Choose the best broad class from: dry fly, nymph, wet fly, streamer, popper, slider, mouse or frog, foam terrestrial, jig, spoon, spinner, hard-bodied lure, or unknown.
+Describe only visible evidence: number and placement of hooks, hook profile, whether the body is tied fibers/dubbing versus molded plastic/painted metal, reflective or rigid surfaces, cupped popper face, foam, bead or weight, tail, body, rib, thorax, hackle, wing, rubber legs, colors, and proportions. Explicitly state important absent features. Do not call something a foam terrestrial unless foam plus terrestrial-style legs or wing are actually visible. A painted or molded head, cupped face, metal spoon body, feathered lure tail, or hard body must be classified accordingly. Only after the broad class is established may you suggest up to three compatible names. Do not output JSON and do not provide tying instructions.`
 }
 
 function extractAiText(response) {
@@ -337,7 +338,7 @@ function extractAiText(response) {
 
 function buildFlyPrompt(knownPatterns = []) {
   return `Identify the tied fishing fly described in the supplied visual report. Use only the report's visible evidence: hook shape, bead or weight, tail, body, rib, thorax, hackle, wing, legs, color, profile, and proportions.
-Return the requested structured fields with actual observations from the visual report. Never repeat field descriptions or instructions as answers. If the exact pattern is uncertain, use a descriptive fly family as the name and put plausible established patterns in closeMatches. Never claim an exact commercial or proprietary pattern without strong visual evidence. Suggested materials and steps are an approximate tie based only on visible construction, never an exact published recipe.
+Return the requested structured fields with actual observations from the visual report. Preserve its broad construction class; do not replace a popper, streamer, jig, spoon, spinner, or hard-bodied lure with a terrestrial pattern. Never repeat field descriptions or instructions as answers. If the exact pattern is uncertain, use a descriptive compatible family as the name and put plausible established patterns in closeMatches. Never claim an exact commercial or proprietary pattern without strong visual evidence. Suggested materials and steps are an approximate tie based only on visible construction, never an exact published recipe.
 Set isFly false, confidence 0, and text/list fields empty when no tied fishing fly is clearly visible. Known HoodFlyLog pattern names are weak hints only and must not override the visual report: ${JSON.stringify(knownPatterns)}`
 }
 function normalizeFlyIdentification(value) {
