@@ -254,6 +254,8 @@ function Knots({ customKnots, onAddCustomKnot, onRemoveCustomKnot }) {
 }
 
 function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
+  const flyCameraRef = useRef(null)
+  const flyGalleryRef = useRef(null)
   const [formData, setFormData] = useState({
     name: "",
     type: "",
@@ -266,6 +268,10 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
   const [query, setQuery] = useState("")
   const [classicPatterns, setClassicPatterns] = useState([])
   const [classicStatus, setClassicStatus] = useState("Loading classic patterns...")
+  const [flyPhoto, setFlyPhoto] = useState(null)
+  const [flyAnalysis, setFlyAnalysis] = useState(null)
+  const [flyAnalysisStatus, setFlyAnalysisStatus] = useState("")
+  const [isAnalyzingFly, setIsAnalyzingFly] = useState(false)
   const flies = [
     {
       name: "Woolly Bugger",
@@ -319,6 +325,21 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
       tip: "Excellent after rain or in stained water. Red, pink, wine, and brown are common choices.",
     },
     {
+      name: "Chubby Chernobyl",
+      type: "Foam terrestrial dry fly",
+      bestFor: "Trout, bass, and warmwater fish",
+      materials: "2XL terrestrial hook, tying thread, dubbed body, closed-cell foam overbody, polypropylene or synthetic wing, and barred rubber legs",
+      steps: ["Start the thread and build a dubbed body.", "Tie in the rear foam overbody and rear rubber legs.", "Add the synthetic wing over the foam.", "Secure the middle and front rubber legs.", "Tie down the front foam head, trim the foam and wing, and finish the thread head."],
+      tip: "Fish it tight to banks, under overhanging cover, or as the buoyant top fly in a dry-dropper rig.",
+    },
+    {
+      name: "Stubby Chubby",
+      type: "Compact foam terrestrial dry fly",
+      bestFor: "Trout and warmwater fish",
+      materials: "Terrestrial hook, tying thread, compact dubbed body, closed-cell foam, synthetic wing, and barred rubber legs",
+      steps: ["Build a compact dubbed body on the hook shank.", "Tie in the rear foam section and rear legs.", "Secure a sparse synthetic wing over the body.", "Add the remaining rubber legs at the middle and front.", "Fold and secure the front foam head, trim the profile, and finish."],
+      tip: "Use it as a compact searching dry or dry-dropper indicator around banks, pocket water, and terrestrial activity.",
+    },    {
       name: "Foam Hopper",
       type: "Terrestrial",
       bestFor: "Bass, bluegill, trout",
@@ -340,6 +361,9 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
   const matchingClassicPatterns = classicPatterns.filter((pattern) => !normalizedQuery || [pattern.title, pattern.authorName, pattern.bookTitle]
     .some((value) => String(value || "").toLowerCase().includes(normalizedQuery)))
   const displayedClassicPatterns = normalizedQuery ? matchingClassicPatterns.slice(0, 24) : []
+  const identificationTerms = flyAnalysis?.suggestions ? [flyAnalysis.suggestions.name, ...(flyAnalysis.suggestions.closeMatches || [])].filter(Boolean) : []
+  const identifiedLibraryMatches = flyLibrary.filter((fly) => identificationTerms.some((term) => namesOverlap(fly.name, term))).slice(0, 6)
+  const identifiedClassicMatches = classicPatterns.filter((pattern) => identificationTerms.some((term) => namesOverlap(pattern.title, term))).slice(0, 8)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -358,10 +382,84 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
     return () => controller.abort()
   }, [])
 
+  useEffect(() => () => {
+    if (flyPhoto?.previewUrl) URL.revokeObjectURL(flyPhoto.previewUrl)
+  }, [flyPhoto])
   function updateField(field, value) {
     setFormData((current) => ({ ...current, [field]: value }))
   }
 
+  function selectFlyPhoto(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    setFlyPhoto((current) => {
+      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
+      return { file, name: file.name, previewUrl: URL.createObjectURL(file) }
+    })
+    setFlyAnalysis(null)
+    setFlyAnalysisStatus("")
+  }
+
+  async function analyzeFlyPhoto() {
+    if (!flyPhoto?.file) return
+    setIsAnalyzingFly(true)
+    setFlyAnalysis(null)
+    setFlyAnalysisStatus("Analyzing visible materials and searching for close patterns...")
+    try {
+      const { data } = await supabase.auth.getSession()
+      const accessToken = data.session?.access_token
+      if (!accessToken) throw new Error("Sign in again before using Fly Identifier.")
+      const body = new FormData()
+      body.append("photo", await prepareFlyImage(flyPhoto.file), "fly-analysis.jpg")
+      body.append("knownPatterns", JSON.stringify(flyLibrary.map((fly) => fly.name).slice(0, 40)))
+      const response = await fetch("/api/analyze-fly", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body })
+      const payload = await readFlyApiJson(response)
+      if (!response.ok) throw new Error(payload.error || "Fly analysis failed.")
+      setFlyAnalysis(payload)
+      setFlyAnalysisStatus(payload.suggestions?.isFly
+        ? "Possible fly matches found. Review the identification and approximation carefully."
+        : "A tied fishing fly could not be identified in this photo. Try a closer side-profile image.")
+    } catch (error) {
+      setFlyAnalysisStatus(error.message || "Fly analysis failed. Try again or search manually.")
+    } finally {
+      setIsAnalyzingFly(false)
+    }
+  }
+
+  function useFlySuggestion() {
+    const suggestion = flyAnalysis?.suggestions
+    if (!suggestion?.name) return
+    setFormData((current) => ({
+      ...current,
+      name: suggestion.name,
+      type: suggestion.category,
+      materials: suggestion.approximateMaterials.join(", "),
+      tip: [suggestion.fishingTip, suggestion.approximateSteps.length ? `${suggestion.recipeStatus === "library" ? "Steps" : "Approximate steps"}: ${suggestion.approximateSteps.join(" ")}` : "", suggestion.recipeStatus === "library" ? "HoodFlyLog library recipe selected." : "AI-generated approximation—verify materials and steps before tying."].filter(Boolean).join(" "),
+    }))
+    setMessage("Suggestion copied into the editable custom-fly form.")
+  }
+  function selectFlyMatch(name) {
+    const libraryFly = flyLibrary.find((fly) => namesOverlap(fly.name, name))
+    setQuery(name)
+    if (!libraryFly) {
+      setMessage(`${name} selected for library search. No HoodFlyLog recipe is stored yet.`)
+      return
+    }
+    setFlyAnalysis((current) => ({
+      ...current,
+      suggestions: {
+        ...current.suggestions,
+        name: libraryFly.name,
+        category: libraryFly.type,
+        approximateMaterials: libraryFly.materials.split(",").map((material) => material.trim()).filter(Boolean),
+        approximateSteps: libraryFly.steps || [],
+        fishingTip: libraryFly.tip,
+        recipeStatus: "library",
+      },
+    }))
+    setFlyAnalysisStatus(`${libraryFly.name} selected. Instructions updated from the HoodFlyLog library.`)
+  }
   function addFly(event) {
     event.preventDefault()
     if (!formData.name.trim()) {
@@ -398,6 +496,34 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
           <h2>🪰 Fly Tying Library</h2>
         </div>
       </div>
+
+      <section className="flyIdentifierPanel">
+        <div className="sectionHeader compactHeader">
+          <div><p className="eyebrow">Photo identification</p><h3>📷 Identify a Fly</h3></div>
+        </div>
+        <input ref={flyCameraRef} className="hiddenFileInput" type="file" accept="image/*" capture="environment" onChange={selectFlyPhoto} />
+        <input ref={flyGalleryRef} className="hiddenFileInput" type="file" accept="image/*" onChange={selectFlyPhoto} />
+        <div className="photoButtonRow">
+          <button type="button" className="cameraBtn" onClick={() => flyCameraRef.current?.click()}>📸 Take Photo</button>
+          <button type="button" className="secondaryBtn" onClick={() => flyGalleryRef.current?.click()}>🖼️ Choose Photo</button>
+        </div>
+        {flyPhoto && <div className="flyIdentifierPreview"><img src={flyPhoto.previewUrl} alt="Fly to identify" /><span>{flyPhoto.name}</span></div>}
+        <button type="button" className="aiAnalyzeBtn" disabled={!flyPhoto || isAnalyzingFly} onClick={analyzeFlyPhoto}>{isAnalyzingFly ? "Identifying fly..." : "✨ Identify Fly + Suggest Tie"}</button>
+        <small className="aiPrivacyNote">AI compares visible construction with known pattern names. Results and tying steps may be wrong; generated recipes are always labeled as approximations.</small>
+        {flyAnalysisStatus && <p className="formMessage" role="status">{flyAnalysisStatus}</p>}
+        {flyAnalysis?.suggestions?.isFly && <div className="flyIdentificationResult">
+          <div><span className="customBadge">{flyAnalysis.suggestions.recipeStatus === "library" ? "Library recipe" : "AI approximation"}</span><strong>{flyAnalysis.suggestions.name || "Unknown fly"}</strong></div>
+          <p><strong>Confidence:</strong> {formatFlyConfidence(flyAnalysis.suggestions.confidence)} · <strong>Category:</strong> {flyAnalysis.suggestions.category || "Unknown"}</p>
+          {flyAnalysis.suggestions.closeMatches.length > 0 && <p><strong>Close matches:</strong> {flyAnalysis.suggestions.closeMatches.map((name, index) => <span key={name}>{index ? ", " : ""}<button className="speciesSuggestionBtn" type="button" onClick={() => selectFlyMatch(name)}>{name}</button></span>)}</p>}
+          {flyAnalysis.suggestions.visibleMaterials.length > 0 && <p><strong>Visible construction:</strong> {flyAnalysis.suggestions.visibleMaterials.join(", ")}</p>}
+          {flyAnalysis.suggestions.approximateMaterials.length > 0 && <p><strong>{flyAnalysis.suggestions.recipeStatus === "library" ? "Library materials:" : "Suggested materials—not a verified recipe:"}</strong> {flyAnalysis.suggestions.approximateMaterials.join(", ")}</p>}
+          {flyAnalysis.suggestions.approximateSteps.length > 0 && <><strong>{flyAnalysis.suggestions.recipeStatus === "library" ? "Library tying sequence:" : "Approximate tying sequence:"}</strong><ol>{flyAnalysis.suggestions.approximateSteps.map((step) => <li key={step}>{step}</li>)}</ol></>}
+          {flyAnalysis.suggestions.fishingTip && <p><strong>How to fish it:</strong> {flyAnalysis.suggestions.fishingTip}</p>}
+          {flyAnalysis.suggestions.reasoning && <p><strong>Why:</strong> {flyAnalysis.suggestions.reasoning}</p>}
+          <div className="flyIdentifierActions"><button type="button" className="secondaryBtn" onClick={() => setQuery(flyAnalysis.suggestions.name)}>Search library</button><button type="button" className="heroBtn" onClick={useFlySuggestion}>Edit and save as custom</button></div>
+          {(identifiedLibraryMatches.length > 0 || identifiedClassicMatches.length > 0) && <div className="groundedFlyMatches"><strong>Library matches</strong>{identifiedLibraryMatches.map((fly) => <button type="button" key={fly.id || fly.name} onClick={() => setQuery(fly.name)}>{fly.name}</button>)}{identifiedClassicMatches.map((pattern) => <a key={pattern.url} href={pattern.url} target="_blank" rel="noreferrer">{pattern.title} ↗</a>)}</div>}
+        </div>}
+      </section>
 
       <div className="flySearchPanel">
         <label htmlFor="fly-pattern-search">Search flies, materials, species, authors, or books</label>
@@ -477,6 +603,43 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
   )
 }
 
+function namesOverlap(left, right) {
+  const a = String(left || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  const b = String(right || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  return Boolean(a && b && (a.includes(b) || b.includes(a)))
+}
+
+function formatFlyConfidence(value) {
+  const confidence = Number(value)
+  return Number.isFinite(confidence) ? `${Math.round(Math.max(0, Math.min(1, confidence)) * 100)}%` : "Not available"
+}
+
+async function readFlyApiJson(response) {
+  const body = await response.text()
+  if (!body.trim()) throw new Error("Fly Identifier returned an empty response. Use npm run dev:worker for local AI testing.")
+  try {
+    return JSON.parse(body)
+  } catch {
+    throw new Error("Fly Identifier was unavailable. Use npm run dev:worker for local AI testing.")
+  }
+}
+
+async function prepareFlyImage(file) {
+  if (!file.type.startsWith("image/") || typeof createImageBitmap !== "function") return file
+  let bitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    return file
+  }
+  const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", 0.82))
+}
 function getYouTubeVideoId(value) {
   if (!value) return ""
   try {
@@ -602,7 +765,11 @@ function AuthPanel() {
     setIsSubmitting(true)
 
     const authAction = isSignUp
-      ? supabase.auth.signUp({ email, password })
+      ? supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${window.location.origin}/` },
+      })
       : supabase.auth.signInWithPassword({ email, password })
     const { error } = await authAction
 

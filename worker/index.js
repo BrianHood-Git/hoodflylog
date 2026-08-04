@@ -1,4 +1,23 @@
 const WORKERS_VISION_MODEL = "@cf/moondream/moondream3.1-9B-A2B"
+const FLY_VISION_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
+const OWNER_EMAIL = "nasskater89@gmail.com"
+const FLY_IDENTIFICATION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["isFly", "name", "confidence", "category", "closeMatches", "visibleMaterials", "approximateMaterials", "approximateSteps", "fishingTip", "reasoning"],
+  properties: {
+    isFly: { type: "boolean" },
+    name: { type: "string", description: "Likely established pattern name or a descriptive fly family when uncertain." },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    category: { type: "string" },
+    closeMatches: { type: "array", maxItems: 3, items: { type: "string" } },
+    visibleMaterials: { type: "array", maxItems: 8, items: { type: "string" } },
+    approximateMaterials: { type: "array", maxItems: 12, items: { type: "string" } },
+    approximateSteps: { type: "array", maxItems: 6, items: { type: "string" } },
+    fishingTip: { type: "string" },
+    reasoning: { type: "string" },
+  },
+}
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const DAILY_REQUEST_LIMIT = 10
 const DAILY_LOCATION_LIMIT = 50
@@ -17,6 +36,11 @@ export default {
         return json({ error: "Method not allowed" }, 405)
       }
       return analyzeCatch(request, env, context)
+    }
+
+    if (url.pathname === "/api/analyze-fly") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405)
+      return analyzeFly(request, env, context)
     }
 
     if (url.pathname === "/api/location-suggestion") {
@@ -244,6 +268,130 @@ async function analyzeCatch(request, env, context) {
   }
 }
 
+async function analyzeFly(request, env, context) {
+  try {
+    const user = await authenticateUser(request, env)
+    if (!user) return json({ error: "Sign in before using Fly Identifier." }, 401)
+    const moderator = await isModeratorAccount(request, user, env)
+    const rateLimit = moderator
+      ? { allowed: true, remaining: null }
+      : await consumeDailyLimit(user.id, "fly-identifier", DAILY_REQUEST_LIMIT, context)
+    if (!rateLimit.allowed) return json({ error: `Daily Fly Identifier limit reached (${DAILY_REQUEST_LIMIT}).` }, 429)
+
+    const form = await request.formData()
+    const photo = form.get("photo")
+    if (!(photo instanceof File)) return json({ error: "A fly photo is required." }, 400)
+    if (!photo.type.startsWith("image/")) return json({ error: "The uploaded file must be an image." }, 400)
+    if (photo.size > MAX_IMAGE_BYTES) return json({ error: "Photo must be smaller than 5 MB." }, 413)
+    if (!env.AI) return json({ error: "Workers AI is not configured." }, 503)
+
+    const bytes = new Uint8Array(await photo.arrayBuffer())
+    const knownPatterns = parseKnownPatterns(form.get("knownPatterns"))
+    const result = await analyzeFlyWithWorkersAi(bytes, photo.type, knownPatterns, env)
+    return json({
+      provider: "workers-ai",
+      model: result.model,
+      suggestions: normalizeFlyIdentification(parseModelJson(result.text)),
+      remainingToday: rateLimit.remaining,
+      unlimited: moderator,
+    })
+  } catch (error) {
+    console.error("Fly identification failed", error)
+    return json({ error: safeErrorMessage(error) }, 500)
+  }
+}
+
+async function analyzeFlyWithWorkersAi(bytes, mimeType, knownPatterns, env) {
+  const visionResponse = await env.AI.run(FLY_VISION_MODEL, {
+    prompt: buildFlyVisionPrompt(),
+    image: `data:${mimeType};base64,${bytesToBase64(bytes)}`,
+    stream: false,
+    max_tokens: 450,
+    temperature: 0.1,
+  })
+  const visualReport = extractAiText(visionResponse)
+  if (!visualReport.trim()) throw new Error("The vision model returned an empty visual report.")
+
+  const response = await env.AI.run(FLY_VISION_MODEL, {
+    prompt: `${buildFlyPrompt(knownPatterns)}\nVisual report from the image model:\n${visualReport.slice(0, 4000)}`,
+    guided_json: FLY_IDENTIFICATION_SCHEMA,
+    stream: false,
+    max_tokens: 700,
+    temperature: 0.1,
+  })
+  const output = response.response ?? response.answer ?? response.result?.response ?? response.result?.answer ?? response
+  return {
+    model: FLY_VISION_MODEL,
+    text: typeof output === "string" ? output : JSON.stringify(output),
+  }
+}
+
+function buildFlyVisionPrompt() {
+  return `Inspect this image as a fly-fishing expert. First decide whether it clearly contains a tied fishing fly. Describe only what is visibly present: overall fly family, hook profile, foam, bead or weight, tail, body, rib, thorax, hackle, wing, rubber legs, colors, proportions, and orientation. Suggest up to three established pattern names only when supported by those features. Pay special attention to foam terrestrials such as Chubby Chernobyl, Stubby Chubby, hopper, stonefly, and ant patterns. Do not output JSON and do not provide tying instructions.`
+}
+
+function extractAiText(response) {
+  const output = response?.response ?? response?.answer ?? response?.result?.response ?? response?.result?.answer ?? response
+  return typeof output === "string" ? output : JSON.stringify(output ?? "")
+}
+
+function buildFlyPrompt(knownPatterns = []) {
+  return `Identify the tied fishing fly described in the supplied visual report. Use only the report's visible evidence: hook shape, bead or weight, tail, body, rib, thorax, hackle, wing, legs, color, profile, and proportions.
+Return the requested structured fields with actual observations from the visual report. Never repeat field descriptions or instructions as answers. If the exact pattern is uncertain, use a descriptive fly family as the name and put plausible established patterns in closeMatches. Never claim an exact commercial or proprietary pattern without strong visual evidence. Suggested materials and steps are an approximate tie based only on visible construction, never an exact published recipe.
+Set isFly false, confidence 0, and text/list fields empty when no tied fishing fly is clearly visible. Known HoodFlyLog pattern names are weak hints only and must not override the visual report: ${JSON.stringify(knownPatterns)}`
+}
+function normalizeFlyIdentification(value) {
+  if (containsFlyPromptPlaceholder(value)) {
+    throw new Error("The vision model returned template text instead of an identification. Try a closer side-profile photo.")
+  }
+  const isFly = value?.isFly === true
+  const name = isFly ? cleanString(value.name, 100) : ""
+  const confidence = Number(value?.confidence)
+  return {
+    isFly,
+    name,
+    confidence: isFly && value?.confidence !== null && Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+    category: isFly ? cleanString(value.category, 50) : "",
+    closeMatches: normalizeStringList(value.closeMatches, 3, 100, name),
+    visibleMaterials: normalizeStringList(value.visibleMaterials, 8, 140),
+    approximateMaterials: normalizeStringList(value.approximateMaterials, 12, 100),
+    approximateSteps: normalizeStringList(value.approximateSteps, 6, 180),
+    fishingTip: isFly ? cleanString(value.fishingTip, 240) : "",
+    reasoning: isFly ? cleanReasoning(value.reasoning) : "",
+    recipeStatus: "approximation",
+  }
+}
+
+function containsFlyPromptPlaceholder(value) {
+  const text = JSON.stringify(value || {}).toLowerCase()
+  return [
+    "likely pattern name or descriptive family",
+    "one cautious sentence",
+    "one short explanation of the visual evidence",
+    "up to three plausible pattern names",
+    "suggested material",
+    "dry fly, nymph, emerger, streamer",
+  ].some((placeholder) => text.includes(placeholder))
+}
+function normalizeStringList(value, limit, maxLength, excluded = "") {
+  if (!Array.isArray(value)) return []
+  const seen = new Set(excluded ? [excluded.toLowerCase()] : [])
+  return value.map((item) => cleanString(item, maxLength)).filter((item) => {
+    const key = item.toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).slice(0, limit)
+}
+
+function parseKnownPatterns(raw) {
+  if (typeof raw !== "string") return []
+  try {
+    return normalizeStringList(JSON.parse(raw), 40, 100)
+  } catch {
+    return []
+  }
+}
 async function analyzeWithWorkersAi(bytes, mimeType, contextData, env) {
   const response = await env.AI.run(WORKERS_VISION_MODEL, {
     task: "query",
@@ -500,6 +648,26 @@ async function authenticateUser(request, env) {
   return response.json()
 }
 
+async function isModeratorAccount(request, user, env) {
+  if (String(user?.email || "").toLowerCase() === OWNER_EMAIL) return true
+  const authorization = request.headers.get("Authorization")
+  if (!authorization || !user?.id) return false
+  try {
+    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=role&limit=1`, {
+      headers: {
+        Authorization: authorization,
+        apikey: env.SUPABASE_ANON_KEY,
+        Accept: "application/json",
+      },
+    })
+    if (!response.ok) return false
+    const profiles = await response.json()
+    return profiles?.[0]?.role === "moderator"
+  } catch (error) {
+    console.error("Moderator role lookup failed", error)
+    return false
+  }
+}
 async function consumeDailyRequest(userId, env, context) {
   return consumeDailyLimit(userId, "catch-assistant", DAILY_REQUEST_LIMIT, context)
 }
@@ -582,12 +750,16 @@ function json(payload, status = 200) {
 }
 
 export {
+  analyzeFlyWithWorkersAi,
   analyzeWithWorkersAi,
   chooseGeoapifySuggestion,
   buildPrompt,
+  buildFlyPrompt,
   normalizeSuggestions,
+  normalizeFlyIdentification,
   getNearbyFishCandidates,
   getGbifCandidates,
+  isModeratorAccount,
   mergeFishCandidates,
   normalizeFlyPatterns,
   parseModelJson,

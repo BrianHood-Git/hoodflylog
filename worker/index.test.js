@@ -1,17 +1,112 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
+  analyzeFlyWithWorkersAi,
   analyzeWithWorkersAi,
   buildPrompt,
+  buildFlyPrompt,
   chooseGeoapifySuggestion,
   normalizeSuggestions,
+  normalizeFlyIdentification,
   normalizeFlyPatterns,
   getNearbyFishCandidates,
+  isModeratorAccount,
   mergeFishCandidates,
   parseModelJson,
   rulesFallback,
 } from "./index.js"
 
+test("isModeratorAccount recognizes the protected owner", async () => {
+  const request = new Request("https://example.com", { headers: { Authorization: "Bearer token" } })
+  assert.equal(await isModeratorAccount(request, { id: "owner", email: "NASSKATER89@GMAIL.COM" }, {}), true)
+})
+
+test("isModeratorAccount verifies profile roles through Supabase", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => Response.json([{ role: "moderator" }])
+  try {
+    const request = new Request("https://example.com", { headers: { Authorization: "Bearer token" } })
+    assert.equal(await isModeratorAccount(request, { id: "user-1", email: "mod@example.com" }, {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_ANON_KEY: "anon-key",
+    }), true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+test("normalizeFlyIdentification limits generated approximation fields", () => {
+  const value = normalizeFlyIdentification({
+    isFly: true,
+    name: "Woolly Bugger",
+    confidence: 1.4,
+    category: "Streamer",
+    closeMatches: ["Woolly Bugger", "Leech", "Zonker", "Extra"],
+    visibleMaterials: ["marabou tail", "hackled body"],
+    approximateMaterials: ["hook", "marabou", "chenille"],
+    approximateSteps: ["Tie in tail", "Wrap body"],
+    fishingTip: "Strip slowly.",
+    reasoning: "Marabou tail is visible.",
+  })
+  assert.equal(value.name, "Woolly Bugger")
+  assert.equal(value.confidence, 1)
+  assert.deepEqual(value.closeMatches, ["Leech", "Zonker", "Extra"])
+  assert.equal(value.recipeStatus, "approximation")
+})
+
+test("buildFlyPrompt prohibits claiming exact recipes", () => {
+  const prompt = buildFlyPrompt(["Woolly Bugger"])
+  assert.match(prompt, /never an exact published recipe/i)
+  assert.match(prompt, /Known HoodFlyLog pattern names are weak hints only/i)
+  assert.doesNotMatch(prompt, /likely pattern name or descriptive family/i)
+})
+
+test("Fly Identifier uses separate vision and structured passes", async () => {
+  const requests = []
+  const env = { AI: { run: async (model, input) => {
+    requests.push({ model, input })
+    if (input.image) return { response: "A foam terrestrial with a black foam body, tan wing, and rubber legs; likely Chubby Chernobyl family." }
+    return { response: { isFly: true, name: "Chubby Chernobyl", confidence: 0.9 } }
+  } } }
+  const result = await analyzeFlyWithWorkersAi(new Uint8Array([255, 216, 255]), "image/jpeg", ["Chubby Chernobyl"], env)
+  assert.equal(requests.length, 2)
+  assert.equal(requests[0].model, "@cf/meta/llama-4-scout-17b-16e-instruct")
+  assert.match(requests[0].input.image, /^data:image\/jpeg;base64,/)
+  assert.equal(requests[0].input.guided_json, undefined)
+  assert.match(requests[1].input.prompt, /foam terrestrial with a black foam body/i)
+  assert.equal(requests[1].input.guided_json.type, "object")
+  assert.equal(requests[1].input.guided_json.additionalProperties, false)
+  assert.deepEqual(JSON.parse(result.text), { isFly: true, name: "Chubby Chernobyl", confidence: 0.9 })
+})
+
+test("Fly Identifier adapter serializes structured Cloudflare responses", async () => {
+  let call = 0
+  const env = { AI: { run: async () => {
+    call += 1
+    return call === 1
+      ? { answer: "Visible foam terrestrial with rubber legs." }
+      : { response: { isFly: true, name: "Chubby Chernobyl", confidence: 0.91 } }
+  } } }
+  const result = await analyzeFlyWithWorkersAi(new Uint8Array([255, 216, 255]), "image/jpeg", [], env)
+  assert.deepEqual(JSON.parse(result.text), {
+    isFly: true,
+    name: "Chubby Chernobyl",
+    confidence: 0.91,
+  })
+})
+test("normalizeFlyIdentification rejects copied prompt placeholders", () => {
+  assert.throws(() => normalizeFlyIdentification({
+    isFly: true,
+    name: "likely pattern name or descriptive family",
+    confidence: 0.72,
+    category: "dry fly, nymph, emerger, streamer, wet fly, terrestrial",
+    closeMatches: ["Woolly Bugger", "Clouser Minnow", "Pheasant Tail Nymph"],
+    visibleMaterials: ["Wool", "Silk", "Thread"],
+    approximateMaterials: ["Wool", "Silk", "Thread"],
+    approximateSteps: ["Tie a Woolly Bugger body with silk thread and hair."],
+    fishingTip: "One cautious sentence describing visible construction and uncertainty.",
+    reasoning: "One short explanation of the visual evidence and uncertainty",
+  }), /template text/i)
+})
 test("normalizeFlyPatterns creates attributed source links and drops blank records", () => {
   const patterns = normalizeFlyPatterns([
     { title: "The Black and Yellow", authorName: "Francis Francis", authorSlug: "francis-francis", bookTitle: "A Book on Angling", bookSlug: "a-book-on-angling", slug: "the-black-and-yellow" },

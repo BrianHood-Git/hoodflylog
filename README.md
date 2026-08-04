@@ -152,6 +152,7 @@ Current pages:
 - [ ] Step-by-step instructions
 - [x] YouTube videos
 - [x] Searchable FlyPattern.org classic-pattern index with source attribution
+- [x] AI photo identification with close matches and approximate tying guidance
 
 ---
 

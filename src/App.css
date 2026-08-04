@@ -1186,6 +1186,84 @@ h3 {
   text-decoration: underline;
   cursor: pointer;
 }
+.flyIdentifierPanel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #d8c69e;
+  border-radius: 12px;
+  background: #fbf4e8;
+}
+
+.hiddenFileInput {
+  display: none;
+}
+
+.flyIdentifierPreview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 800;
+}
+
+.flyIdentifierPreview img {
+  width: 92px;
+  height: 92px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.flyIdentificationResult {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #b7ca91;
+  border-radius: 12px;
+  background: #eef4dc;
+}
+
+.flyIdentificationResult > div:first-child,
+.flyIdentifierActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.flyIdentificationResult p,
+.flyIdentificationResult ol {
+  margin: 0;
+}
+
+.flyIdentificationResult ol {
+  padding-left: 22px;
+}
+
+.groundedFlyMatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #c6d9a2;
+}
+
+.groundedFlyMatches strong {
+  flex-basis: 100%;
+}
+
+.groundedFlyMatches button,
+.groundedFlyMatches a {
+  padding: 7px 10px;
+  border: 1px solid #b7ca91;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #185734;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
 .flySearchPanel {
   display: grid;
   gap: 8px;
