@@ -77,34 +77,27 @@ test("buildFlyPrompt prohibits claiming exact recipes", () => {
   assert.doesNotMatch(prompt, /likely pattern name or descriptive family/i)
 })
 
-test("Fly Identifier uses separate vision and structured passes", async () => {
+test("Fly Identifier uses one structured multimodal Mistral request", async () => {
   const requests = []
   const env = { AI: { run: async (model, input) => {
     requests.push({ model, input })
-    if (input.image) return { response: "A foam terrestrial with a black foam body, tan wing, and rubber legs; likely Chubby Chernobyl family." }
     return { response: { isFly: true, name: "Chubby Chernobyl", confidence: 0.9 } }
   } } }
   const result = await analyzeFlyWithWorkersAi(new Uint8Array([255, 216, 255]), "image/jpeg", ["Chubby Chernobyl"], env)
-  assert.equal(requests.length, 2)
-  assert.equal(requests[0].model, "@cf/meta/llama-4-scout-17b-16e-instruct")
-  assert.match(requests[0].input.image, /^data:image\/jpeg;base64,/)
-  assert.equal(requests[0].input.guided_json, undefined)
-  assert.match(requests[0].input.prompt, /classify the construction before naming it/i)
-  assert.match(requests[0].input.prompt, /cupped popper face/i)
-  assert.doesNotMatch(requests[0].input.prompt, /pay special attention to foam terrestrials/i)
-  assert.match(requests[1].input.prompt, /foam terrestrial with a black foam body/i)
-  assert.equal(requests[1].input.guided_json.type, "object")
-  assert.equal(requests[1].input.guided_json.additionalProperties, false)
+  assert.equal(requests.length, 1)
+  assert.equal(requests[0].model, "@cf/mistralai/mistral-small-3.1-24b-instruct")
+  const [textPart, imagePart] = requests[0].input.messages[0].content
+  assert.match(textPart.text, /rigid painted or molded head/i)
+  assert.match(textPart.text, /top-down photo/i)
+  assert.match(imagePart.image_url.url, /^data:image\/jpeg;base64,/)
+  assert.equal(requests[0].input.guided_json.type, "object")
+  assert.equal(requests[0].input.guided_json.additionalProperties, false)
   assert.deepEqual(JSON.parse(result.text), { isFly: true, name: "Chubby Chernobyl", confidence: 0.9 })
 })
 
 test("Fly Identifier adapter serializes structured Cloudflare responses", async () => {
-  let call = 0
   const env = { AI: { run: async () => {
-    call += 1
-    return call === 1
-      ? { answer: "Visible foam terrestrial with rubber legs." }
-      : { response: { isFly: true, name: "Chubby Chernobyl", confidence: 0.91 } }
+    return { response: { isFly: true, name: "Chubby Chernobyl", confidence: 0.91 } }
   } } }
   const result = await analyzeFlyWithWorkersAi(new Uint8Array([255, 216, 255]), "image/jpeg", [], env)
   assert.deepEqual(JSON.parse(result.text), {
@@ -112,6 +105,22 @@ test("Fly Identifier adapter serializes structured Cloudflare responses", async 
     name: "Chubby Chernobyl",
     confidence: 0.91,
   })
+})
+
+test("normalizeFlyIdentification accepts Mistral recipe aliases and infers category", () => {
+  const value = normalizeFlyIdentification({
+    isFly: true,
+    name: "Woolly Bugger family",
+    confidence: 0.85,
+    closeMatches: ["Marabou Streamer"],
+    observations: { tail: "brown marabou", head: "gold bead" },
+    suggestedMaterials: ["brown marabou", "gold bead"],
+    suggestedSteps: ["Attach the bead.", "Tie in the marabou tail."],
+  })
+  assert.equal(value.category, "Streamer")
+  assert.deepEqual(value.visibleMaterials, ["brown marabou", "gold bead"])
+  assert.deepEqual(value.approximateMaterials, ["brown marabou", "gold bead"])
+  assert.deepEqual(value.approximateSteps, ["Attach the bead.", "Tie in the marabou tail."])
 })
 test("normalizeFlyIdentification rejects copied prompt placeholders", () => {
   assert.throws(() => normalizeFlyIdentification({

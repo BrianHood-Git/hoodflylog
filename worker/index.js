@@ -1,5 +1,5 @@
 const WORKERS_VISION_MODEL = "@cf/moondream/moondream3.1-9B-A2B"
-const FLY_VISION_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
+const FLY_VISION_MODEL = "@cf/mistralai/mistral-small-3.1-24b-instruct"
 const OWNER_EMAIL = "nasskater89@gmail.com"
 const FLY_IDENTIFICATION_SCHEMA = {
   type: "object",
@@ -302,18 +302,15 @@ async function analyzeFly(request, env, context) {
 }
 
 async function analyzeFlyWithWorkersAi(bytes, mimeType, knownPatterns, env) {
-  const visionResponse = await env.AI.run(FLY_VISION_MODEL, {
-    prompt: buildFlyVisionPrompt(),
-    image: `data:${mimeType};base64,${bytesToBase64(bytes)}`,
-    stream: false,
-    max_tokens: 450,
-    temperature: 0.1,
-  })
-  const visualReport = extractAiText(visionResponse)
-  if (!visualReport.trim()) throw new Error("The vision model returned an empty visual report.")
-
+  const image = `data:${mimeType};base64,${bytesToBase64(bytes)}`
   const response = await env.AI.run(FLY_VISION_MODEL, {
-    prompt: `${buildFlyPrompt(knownPatterns)}\nVisual report from the image model:\n${visualReport.slice(0, 4000)}`,
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: buildFlyPrompt(knownPatterns) },
+        { type: "image_url", image_url: { url: image } },
+      ],
+    }],
     guided_json: FLY_IDENTIFICATION_SCHEMA,
     stream: false,
     max_tokens: 700,
@@ -325,20 +322,9 @@ async function analyzeFlyWithWorkersAi(bytes, mimeType, knownPatterns, env) {
     text: typeof output === "string" ? output : JSON.stringify(output),
   }
 }
-
-function buildFlyVisionPrompt() {
-  return `Inspect this fishing-hook image without assuming it is a fly or any particular pattern. Classify the construction before naming it. Choose the best broad class from: dry fly, nymph, wet fly, streamer, popper, slider, mouse or frog, foam terrestrial, jig, spoon, spinner, hard-bodied lure, or unknown.
-Describe only visible evidence: number and placement of hooks, hook profile, whether the body is tied fibers/dubbing versus molded plastic/painted metal, reflective or rigid surfaces, cupped popper face, foam, bead or weight, tail, body, rib, thorax, hackle, wing, rubber legs, colors, and proportions. Explicitly state important absent features. Do not call something a foam terrestrial unless foam plus terrestrial-style legs or wing are actually visible. A painted or molded head, cupped face, metal spoon body, feathered lure tail, or hard body must be classified accordingly. Only after the broad class is established may you suggest up to three compatible names. Do not output JSON and do not provide tying instructions.`
-}
-
-function extractAiText(response) {
-  const output = response?.response ?? response?.answer ?? response?.result?.response ?? response?.result?.answer ?? response
-  return typeof output === "string" ? output : JSON.stringify(output ?? "")
-}
-
 function buildFlyPrompt(knownPatterns = []) {
-  return `Identify the hook-mounted fishing pattern described in the supplied visual report. For this feature, set isFly true for recognizable tied flies, poppers, sliders, jigs, spoons, spinners, hard-bodied hook lures, and feather-tailed fishing patterns. Set isFly false only when no recognizable hook-mounted fishing pattern is visible. Use only the report's visible evidence: hook shape, bead or weight, tail, body, rib, thorax, hackle, wing, legs, color, profile, and proportions.
-Return the requested structured fields with actual observations from the visual report. Preserve its broad construction class; do not replace a popper, streamer, jig, spoon, spinner, or hard-bodied lure with a terrestrial pattern. Never repeat field descriptions or instructions as answers. If the exact pattern is uncertain, use a descriptive compatible family as the name and put plausible established patterns in closeMatches. Never claim an exact commercial or proprietary pattern without strong visual evidence. Suggested materials and steps are an approximate tie based only on visible construction, never an exact published recipe.
+  return `Identify the hook-mounted fishing pattern visible in the supplied photo. For this feature, set isFly true for recognizable tied flies, poppers, sliders, jigs, spoons, spinners, hard-bodied hook lures, and feather-tailed fishing patterns. Set isFly false only when no recognizable hook-mounted fishing pattern is visible. Use only visible evidence: hook shape, bead or weight, tail, body, rib, thorax, hackle, wing, legs, color, profile, and proportions.
+Return JSON using exactly these keys: isFly, name, confidence, category, closeMatches, visibleMaterials, approximateMaterials, approximateSteps, fishingTip, and reasoning. Populate them with actual observations from the photo. Preserve the broad construction class; do not replace a popper, streamer, jig, spoon, spinner, or hard-bodied lure with a terrestrial pattern. A rigid painted or molded head with a large eye and feather or hair tail is a popper, slider, or hard-bodied lure—not a Woolly Bugger. A bead-head pattern with a long dense marabou or hair tail roughly as long as the body is usually a streamer or Woolly Bugger family, even in a top-down photo. A compact bead-head pattern with a short tail and tapered segmented body is a nymph. A spun deer-hair head with a long feather or hair tail is a streamer or bass bug. Do not choose hopper or Chubby Chernobyl unless foam body plus terrestrial legs or wing are clearly visible. Never repeat field descriptions or instructions as answers. If the exact pattern is uncertain, use a descriptive compatible family as the name and put plausible established patterns in closeMatches. Never claim an exact commercial or proprietary pattern without strong visual evidence. Suggested materials and steps are an approximate tie based only on visible construction, never an exact published recipe.
 Set isFly false, confidence 0, and text/list fields empty only when no recognizable hook-mounted fishing pattern is clearly visible. Known HoodFlyLog pattern names are weak hints only and must not override the visual report: ${JSON.stringify(knownPatterns)}`
 }
 function normalizeFlyIdentification(value) {
@@ -353,17 +339,28 @@ function normalizeFlyIdentification(value) {
     isFly,
     name,
     confidence: isFly && value?.confidence !== null && Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
-    category: isFly ? cleanString(value.category, 50) : "",
+    category: isFly ? inferFlyCategory(value, name) : "",
     closeMatches: normalizeStringList(value.closeMatches, 3, 100, name),
-    visibleMaterials: normalizeStringList(value.visibleMaterials, 8, 140),
-    approximateMaterials: normalizeStringList(value.approximateMaterials, 12, 100),
-    approximateSteps: normalizeStringList(value.approximateSteps, 6, 180),
+    visibleMaterials: normalizeStringList(value.visibleMaterials || Object.values(value.observations || {}), 8, 140),
+    approximateMaterials: normalizeStringList(value.approximateMaterials || value.suggestedMaterials, 12, 100),
+    approximateSteps: normalizeStringList(value.approximateSteps || value.suggestedSteps, 6, 180),
     fishingTip: isFly ? cleanString(value.fishingTip, 240) : "",
     reasoning: isFly ? cleanReasoning(value.reasoning) : "",
     recipeStatus: "approximation",
   }
 }
 
+function inferFlyCategory(value, name) {
+  const supplied = cleanString(value.category || value.class || value.broadClass, 50)
+  if (supplied) return supplied
+  const text = `${name} ${(value.closeMatches || []).join(" ")}`.toLowerCase()
+  if (text.includes("popper")) return "Popper"
+  if (text.includes("nymph")) return "Nymph"
+  if (text.includes("streamer") || text.includes("woolly bugger") || text.includes("muddler") || text.includes("leech")) return "Streamer"
+  if (text.includes("dry fly") || text.includes("caddis") || text.includes("adams")) return "Dry fly"
+  if (text.includes("wet fly") || text.includes("soft hackle")) return "Wet fly"
+  return "Unknown"
+}
 function containsFlyPromptPlaceholder(value) {
   const text = JSON.stringify(value || {}).toLowerCase()
   return [
