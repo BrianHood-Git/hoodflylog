@@ -419,7 +419,7 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
       setFlyAnalysis(payload)
       setFlyAnalysisStatus(payload.suggestions?.isFly
         ? "Possible fly matches found. Review the identification and approximation carefully."
-        : "A tied fishing fly could not be identified in this photo. Try a closer side-profile image.")
+        : "A fly or hook-mounted fishing pattern could not be identified in this photo. Try a closer side-profile image.")
     } catch (error) {
       setFlyAnalysisStatus(error.message || "Fly analysis failed. Try again or search manually.")
     } finally {

@@ -53,6 +53,23 @@ test("normalizeFlyIdentification limits generated approximation fields", () => {
   assert.equal(value.recipeStatus, "approximation")
 })
 
+test("normalizeFlyIdentification preserves named poppers even when the model marks isFly false", () => {
+  const value = normalizeFlyIdentification({
+    isFly: false,
+    name: "Foam Popper",
+    confidence: 0.74,
+    category: "Popper",
+    closeMatches: [],
+    visibleMaterials: ["painted cupped foam head", "feather tail"],
+    approximateMaterials: ["foam popper body", "feathers"],
+    approximateSteps: [],
+    fishingTip: "Fish it on the surface.",
+    reasoning: "A cupped head and hook are visible.",
+  })
+  assert.equal(value.isFly, true)
+  assert.equal(value.name, "Foam Popper")
+  assert.equal(value.category, "Popper")
+})
 test("buildFlyPrompt prohibits claiming exact recipes", () => {
   const prompt = buildFlyPrompt(["Woolly Bugger"])
   assert.match(prompt, /never an exact published recipe/i)

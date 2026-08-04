@@ -6,7 +6,7 @@ const FLY_IDENTIFICATION_SCHEMA = {
   additionalProperties: false,
   required: ["isFly", "name", "confidence", "category", "closeMatches", "visibleMaterials", "approximateMaterials", "approximateSteps", "fishingTip", "reasoning"],
   properties: {
-    isFly: { type: "boolean" },
+    isFly: { type: "boolean", description: "True for any recognizable hook-mounted fly, popper, slider, jig, spoon, spinner, or feather-tailed fishing pattern." },
     name: { type: "string", description: "Likely established pattern name or a descriptive fly family when uncertain." },
     confidence: { type: "number", minimum: 0, maximum: 1 },
     category: { type: "string" },
@@ -337,16 +337,17 @@ function extractAiText(response) {
 }
 
 function buildFlyPrompt(knownPatterns = []) {
-  return `Identify the tied fishing fly described in the supplied visual report. Use only the report's visible evidence: hook shape, bead or weight, tail, body, rib, thorax, hackle, wing, legs, color, profile, and proportions.
+  return `Identify the hook-mounted fishing pattern described in the supplied visual report. For this feature, set isFly true for recognizable tied flies, poppers, sliders, jigs, spoons, spinners, hard-bodied hook lures, and feather-tailed fishing patterns. Set isFly false only when no recognizable hook-mounted fishing pattern is visible. Use only the report's visible evidence: hook shape, bead or weight, tail, body, rib, thorax, hackle, wing, legs, color, profile, and proportions.
 Return the requested structured fields with actual observations from the visual report. Preserve its broad construction class; do not replace a popper, streamer, jig, spoon, spinner, or hard-bodied lure with a terrestrial pattern. Never repeat field descriptions or instructions as answers. If the exact pattern is uncertain, use a descriptive compatible family as the name and put plausible established patterns in closeMatches. Never claim an exact commercial or proprietary pattern without strong visual evidence. Suggested materials and steps are an approximate tie based only on visible construction, never an exact published recipe.
-Set isFly false, confidence 0, and text/list fields empty when no tied fishing fly is clearly visible. Known HoodFlyLog pattern names are weak hints only and must not override the visual report: ${JSON.stringify(knownPatterns)}`
+Set isFly false, confidence 0, and text/list fields empty only when no recognizable hook-mounted fishing pattern is clearly visible. Known HoodFlyLog pattern names are weak hints only and must not override the visual report: ${JSON.stringify(knownPatterns)}`
 }
 function normalizeFlyIdentification(value) {
   if (containsFlyPromptPlaceholder(value)) {
     throw new Error("The vision model returned template text instead of an identification. Try a closer side-profile photo.")
   }
-  const isFly = value?.isFly === true
-  const name = isFly ? cleanString(value.name, 100) : ""
+  const suppliedName = cleanString(value?.name, 100)
+  const isFly = value?.isFly === true || Boolean(suppliedName)
+  const name = isFly ? suppliedName : ""
   const confidence = Number(value?.confidence)
   return {
     isFly,
