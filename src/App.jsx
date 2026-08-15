@@ -3,6 +3,8 @@ import { supabase } from "./supabase"
 import LandingPage from "./components/LandingPage"
 import LogCatch from "./components/LogCatch"
 import JournalPage from "./components/Journal/JournalPage"
+import CommunityFlyLibrary from "./components/FlyTying/CommunityFlyLibrary"
+import CommunityFlyModeration from "./components/FlyTying/CommunityFlyModeration"
 import logo from "./assets/hoodflylog-logo.jpg"
 import "./App.css"
 const OWNER_EMAIL = "nasskater89@gmail.com"
@@ -219,7 +221,7 @@ function Knots({ customKnots, onAddCustomKnot, onRemoveCustomKnot }) {
   )
 }
 
-function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
+function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly, user, isModerator }) {
   const flyCameraRef = useRef(null)
   const flyGalleryRef = useRef(null)
   const [formData, setFormData] = useState({
@@ -238,6 +240,7 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
   const [flyAnalysis, setFlyAnalysis] = useState(null)
   const [flyAnalysisStatus, setFlyAnalysisStatus] = useState("")
   const [isAnalyzingFly, setIsAnalyzingFly] = useState(false)
+  const [communityPatterns, setCommunityPatterns] = useState([])
   const flies = [
     {
       name: "Woolly Bugger",
@@ -321,6 +324,17 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
     },
   ]
   const flyLibrary = [...flies, ...customFlies]
+  const communityRecipeLibrary = communityPatterns.map((pattern) => ({
+    id: pattern.id,
+    name: pattern.name,
+    type: pattern.category,
+    bestFor: pattern.best_for || "Community pattern",
+    materials: pattern.materials.map((item) => item.name).join(", "),
+    steps: pattern.steps.map((step) => step.instruction),
+    tip: pattern.fishing_notes || pattern.summary || "Moderator-reviewed community recipe.",
+    community: true,
+  }))
+  const identificationLibrary = [...flyLibrary, ...communityRecipeLibrary]
   const normalizedQuery = query.trim().toLowerCase()
   const matchingFlies = flyLibrary.filter((fly) => !normalizedQuery || [fly.name, fly.type, fly.bestFor, fly.materials, fly.tip, fly.sourceName]
     .some((value) => String(value || "").toLowerCase().includes(normalizedQuery)))
@@ -328,7 +342,7 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
     .some((value) => String(value || "").toLowerCase().includes(normalizedQuery)))
   const displayedClassicPatterns = normalizedQuery ? matchingClassicPatterns.slice(0, 24) : []
   const identificationTerms = flyAnalysis?.suggestions ? [flyAnalysis.suggestions.name, ...(flyAnalysis.suggestions.closeMatches || [])].filter(Boolean) : []
-  const identifiedLibraryMatches = flyLibrary.filter((fly) => identificationTerms.some((term) => namesOverlap(fly.name, term))).slice(0, 6)
+  const identifiedLibraryMatches = identificationLibrary.filter((fly) => identificationTerms.some((term) => namesOverlap(fly.name, term))).slice(0, 6)
   const identifiedClassicMatches = classicPatterns.filter((pattern) => identificationTerms.some((term) => namesOverlap(pattern.title, term))).slice(0, 8)
 
   useEffect(() => {
@@ -378,7 +392,7 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
       if (!accessToken) throw new Error("Sign in again before using Fly Identifier.")
       const body = new FormData()
       body.append("photo", await prepareFlyImage(flyPhoto.file), "fly-analysis.jpg")
-      body.append("knownPatterns", JSON.stringify(flyLibrary.map((fly) => fly.name).slice(0, 40)))
+      body.append("knownPatterns", JSON.stringify(identificationLibrary.map((fly) => fly.name).slice(0, 60)))
       const response = await fetch("/api/analyze-fly", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body })
       const payload = await readFlyApiJson(response)
       if (!response.ok) throw new Error(payload.error || "Fly analysis failed.")
@@ -406,7 +420,7 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
     setMessage("Suggestion copied into the editable custom-fly form.")
   }
   function selectFlyMatch(name) {
-    const libraryFly = flyLibrary.find((fly) => namesOverlap(fly.name, name))
+    const libraryFly = identificationLibrary.find((fly) => namesOverlap(fly.name, name))
     setQuery(name)
     if (!libraryFly) {
       setMessage(`${name} selected for library search. No HoodFlyLog recipe is stored yet.`)
@@ -503,6 +517,8 @@ function FlyTying({ customFlies, onAddCustomFly, onRemoveCustomFly }) {
       </div>
 
 
+
+      <CommunityFlyLibrary user={user} isModerator={isModerator} query={query} onPatternsLoaded={setCommunityPatterns} />
 
       <div className="sectionHeader flyLibraryHeading">
         <div><p className="eyebrow">Modern and personal</p><h3>HoodFlyLog Patterns</h3></div>
@@ -997,6 +1013,7 @@ function ModeratorAdmin({ currentUser }) {
           })}
         </div>
       </section>
+      <CommunityFlyModeration currentUser={currentUser} />
     </div>
   )
 }
@@ -1637,7 +1654,7 @@ async function saveProfile(formData) {
 />}
     {activePage === "leaderboard" && <Leaderboard catches={communityCatches} onLogCatch={() => setActivePage("log")} />}
     {activePage === "knots" && <Knots customKnots={customKnots} onAddCustomKnot={addCustomKnot} onRemoveCustomKnot={removeCustomKnot} />}
-    {activePage === "flytying" && <FlyTying customFlies={customFlies} onAddCustomFly={addCustomFly} onRemoveCustomFly={removeCustomFly} />}
+    {activePage === "flytying" && <FlyTying customFlies={customFlies} onAddCustomFly={addCustomFly} onRemoveCustomFly={removeCustomFly} user={user} isModerator={isModerator} />}
     {activePage === "profile" && <Profile key={profile?.updated_at || user.id} profile={profile} user={user} onSaveProfile={saveProfile} />}
     {activePage === "moderators" && isModerator && <ModeratorAdmin currentUser={user} />}
       </main>
