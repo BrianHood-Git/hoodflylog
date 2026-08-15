@@ -1,0 +1,444 @@
+.journalPanel {
+  display: grid;
+  gap: 20px;
+}
+
+.journalPageHeader,
+.journalFormHeader,
+.journalSectionHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.journalPageHeader > div,
+.journalFormHeader > div {
+  min-width: 0;
+}
+
+.journalPageHeader h2,
+.journalFormHeader h2 {
+  margin-bottom: 8px;
+}
+
+.journalPageHeader p:last-child,
+.journalSectionHeading p {
+  max-width: 650px;
+  margin: 0;
+  color: #5d503e;
+  line-height: 1.5;
+}
+
+.journalEntryList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.journalEntryCard {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #dfcda9;
+  border-radius: 12px;
+  background: #f6ecd9;
+  color: #061f14;
+  padding: 16px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(58, 40, 19, 0.06);
+  transition: border-color 150ms ease, transform 150ms ease, background 150ms ease;
+}
+
+.journalEntryCard:hover,
+.journalEntryCard:focus-visible {
+  border-color: #8ba45c;
+  background: #eef4dc;
+  transform: translateY(-1px);
+}
+
+.journalEntryCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.journalEntryCardHeader > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.journalEntryCardHeader > span {
+  color: #185734;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.journalEntryDate {
+  color: #6d604c;
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.journalTodayBadge,
+.journalSectionHeading > span {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid #b7ca91;
+  border-radius: 999px;
+  background: #e7f0cf;
+  color: #153e27;
+  padding: 5px 9px;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.journalEntryCard h3 {
+  margin-bottom: 8px;
+}
+
+.journalEntryLocation,
+.journalEntryPreview {
+  margin: 0;
+  color: #5d503e;
+  line-height: 1.45;
+}
+
+.journalEntryPreview {
+  margin-top: 10px;
+}
+
+.journalEmptyState {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 44px 18px;
+  border: 1px dashed #c9b98f;
+  border-radius: 12px;
+  background: #fbf4e8;
+  color: #5d503e;
+  text-align: center;
+}
+
+.journalEmptyState > span {
+  font-size: 3rem;
+}
+
+.journalEmptyState h3,
+.journalEmptyState p {
+  margin: 0;
+}
+
+.journalSecondaryBtn {
+  border: 1px solid #c9b98f;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #153e27;
+  padding: 11px 14px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.journalEntryForm {
+  display: grid;
+  gap: 18px;
+}
+
+.journalFormSection {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #dfcda9;
+  border-radius: 12px;
+  background: #fbf4e8;
+  padding: 16px;
+}
+
+.journalFormSection h3,
+.journalSectionHeading h3 {
+  margin: 0;
+}
+
+.journalFieldGrid,
+.journalTextareaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.journalEntryForm label {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  color: #4c493d;
+  font-weight: 800;
+}
+
+.journalEntryForm input,
+.journalEntryForm textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #dfcda9;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #061f14;
+  padding: 12px 13px;
+  font: inherit;
+}
+
+.journalEntryForm textarea {
+  min-height: 104px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.journalFullWidth,
+.journalFeaturedField {
+  grid-column: 1 / -1;
+}
+
+.journalFeaturedField textarea {
+  min-height: 190px;
+}
+
+.journalTripCatches {
+  background: #eef4dc;
+  border-color: #c6d9a2;
+}
+
+.journalCatchHistory {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid #dfcda9;
+}
+.journalCatchGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.journalCatchCard {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid #d8c69e;
+  border-radius: 10px;
+  background: #fffaf0;
+  padding: 12px;
+}
+
+.journalCatchCard img {
+  width: 110px;
+  height: 96px;
+  border-radius: 9px;
+  object-fit: cover;
+}
+
+.journalCatchCard h4,
+.journalCatchCard p {
+  margin: 0 0 5px;
+}
+
+.journalCatchCard p {
+  color: #5d503e;
+  line-height: 1.35;
+}
+
+.journalCatchNotes {
+  margin-top: 9px !important;
+  padding-top: 9px;
+  border-top: 1px solid #dfcda9;
+}
+
+.journalEmptyCatches {
+  border: 1px dashed #b7ca91;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #5d503e;
+  padding: 18px;
+  text-align: center;
+}
+
+.journalFormActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.journalFormMessage {
+  margin: 0;
+  color: #185734;
+  font-weight: 900;
+}
+
+.journalCatchEditForm {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #c6d9a2;
+  border-radius: 12px;
+  background: #eef4dc;
+  padding: 14px;
+}
+
+.journalCatchEditHeading,
+.journalCatchActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.journalCatchEditHeading {
+  justify-content: space-between;
+}
+
+.journalCatchEditHeading h4 {
+  margin: 0;
+}
+
+.journalCatchEditHeading span {
+  border-radius: 999px;
+  background: #fff0b8;
+  color: #6c4c00;
+  padding: 5px 9px;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.journalCatchEditGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.journalCatchEditGrid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #4c493d;
+  font-weight: 800;
+}
+
+.journalCatchEditGrid input,
+.journalCatchEditGrid textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d8c69e;
+  border-radius: 9px;
+  background: #fffaf0;
+  color: #061f14;
+  padding: 11px 12px;
+  font: inherit;
+}
+
+.journalCatchEditGrid textarea {
+  resize: vertical;
+}
+
+.journalCatchCheckbox {
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: center !important;
+}
+
+.journalCatchCheckbox input {
+  width: auto;
+}
+
+.journalCatchActions .photoActionBtn {
+  width: auto;
+  margin: 0;
+}
+
+.journalDeleteCatchBtn {
+  border: 1px solid #9f352d;
+  border-radius: 10px;
+  background: transparent;
+  color: #8b261f;
+  padding: 11px 14px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.journalDeleteCatchBtn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.journalCatchError {
+  margin: 8px 0 0 !important;
+  color: #8b261f !important;
+  font-weight: 800;
+}
+@media (max-width: 760px) {
+  .journalPageHeader,
+  .journalFormHeader,
+  .journalSectionHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .journalPageHeader .heroBtn,
+  .journalFormHeader .journalSecondaryBtn {
+    width: 100%;
+  }
+
+  .journalEntryList,
+  .journalFieldGrid,
+  .journalTextareaGrid,
+  .journalCatchGrid,
+  .journalCatchEditGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .journalFullWidth,
+  .journalFeaturedField {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .journalPanel {
+    padding: 14px;
+  }
+
+  .journalFormSection {
+    padding: 13px;
+  }
+
+  .journalCatchCard {
+    grid-template-columns: 82px minmax(0, 1fr);
+    padding: 10px;
+  }
+
+  .journalCatchCard img {
+    width: 82px;
+    height: 78px;
+  }
+
+  .journalFormActions,
+  .journalCatchActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .journalFormActions button,
+  .journalCatchActions button,
+  .journalCatchActions .photoActionBtn {
+    width: 100%;
+  }
+}
