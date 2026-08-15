@@ -2,44 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { supabase } from "./supabase"
 import LandingPage from "./components/LandingPage"
 import LogCatch from "./components/LogCatch"
+import JournalPage from "./components/Journal/JournalPage"
 import logo from "./assets/hoodflylog-logo.jpg"
 import "./App.css"
 const OWNER_EMAIL = "nasskater89@gmail.com"
-
-function Journal({ catches, onChooseCatchPhoto, uploadingCatchId }) {
-  return (
-    <div className="panel">
-      <h2>📖 Journal</h2>
-
-      {catches.length === 0 ? (
-        <p>Your saved catches will appear here.</p>
-      ) : (
-        <div className="catchList">
-          {catches.map((fish) => (
-            <div className="catchCard" key={fish.id}>
-              {fish.photo_url && <img src={fish.photo_url} alt={fish.species || "Saved catch"} className="catchPhoto" />}
-              <h3>🎣 {fish.species || "Unknown Fish"}</h3>
-              <p>📍 {fish.location || "No location"}</p>
-              <p>📏 {fish.length || "No length"}</p>
-              <p>🪰 {fish.fly || "No fly listed"}</p>
-              <p>🗓️ {fish.date || "No date"} {fish.time || ""}</p>
-              {fish.notes && <p>📝 {fish.notes}</p>}
-              <span className={`moderationBadge ${fish.moderation_status || "pending"}`}>{fish.moderation_status || "pending"}</span>
-              <button
-                className="photoActionBtn"
-                disabled={uploadingCatchId === fish.id}
-                onClick={() => onChooseCatchPhoto(fish)}
-                type="button"
-              >
-                {uploadingCatchId === fish.id ? "Uploading..." : fish.photo_url ? "📸 Replace Photo" : "📸 Add Photo"}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function Leaderboard({ catches, onLogCatch }) {
   const waters = useMemo(() => {
@@ -1051,6 +1017,7 @@ function App() {
     const saved = localStorage.getItem("hoodflylog-catches")
     return saved ? JSON.parse(saved) : []
   })
+  const [journalEntries, setJournalEntries] = useState(() => readStoredList("hoodflylog-journal-entries"))
   const [viewMode, setViewMode] = useState(() => localStorage.getItem("hoodflylog-view-mode") || "public")
   const [loadStatus, setLoadStatus] = useState("Loading catch log...")
   const [selectedPhoto, setSelectedPhoto] = useState(null)
@@ -1068,6 +1035,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem("hoodflylog-catches", JSON.stringify(catches))
   }, [catches])
+
+  useEffect(() => {
+    localStorage.setItem("hoodflylog-journal-entries", JSON.stringify(journalEntries))
+  }, [journalEntries])
 
   useEffect(() => {
     localStorage.setItem("hoodflylog-view-mode", viewMode)
@@ -1267,6 +1238,61 @@ async function handleSaveCatch(newCatch) {
   return true
 }
 
+function saveJournalEntry(entry) {
+  const now = new Date().toISOString()
+  const saved = {
+    ...entry,
+    created_at: entry.created_at || now,
+    updated_at: now,
+  }
+  setJournalEntries((current) => {
+    const exists = current.some((item) => item.id === saved.id)
+    return exists
+      ? current.map((item) => item.id === saved.id ? saved : item)
+      : [saved, ...current]
+  })
+  return saved
+}
+
+function deleteJournalEntry(entryId) {
+  setJournalEntries((current) => current.filter((entry) => entry.id !== entryId))
+}
+
+async function saveOwnedCatch(catchId, changes) {
+  const { data, error } = await supabase
+    .from("catches")
+    .update({ ...changes, moderation_status: "pending" })
+    .eq("id", catchId)
+    .eq("user_id", user.id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error(error)
+    return { ok: false, error: error.message }
+  }
+  setCatches((current) => current.map((fish) => fish.id === catchId ? data : fish))
+  return { ok: true, catch: data }
+}
+
+async function deleteOwnedCatch(fish) {
+  const { error } = await supabase
+    .from("catches")
+    .delete()
+    .eq("id", fish.id)
+    .eq("user_id", user.id)
+
+  if (error) {
+    console.error(error)
+    return { ok: false, error: error.message }
+  }
+  setCatches((current) => current.filter((item) => item.id !== fish.id))
+  if (fish.photo_path) {
+    const { error: storageError } = await supabase.storage.from("catch-photos").remove([fish.photo_path])
+    if (storageError) console.error(storageError)
+  }
+  return { ok: true }
+}
 async function uploadSelectedPhoto() {
   if (!selectedPhoto?.file) {
     return {}
@@ -1599,7 +1625,16 @@ async function saveProfile(formData) {
     )}
 
    {activePage === "log" && <LogCatch onSaveCatch={handleSaveCatch} selectedPhoto={selectedPhoto} onOpenCamera={openCamera} onChoosePhoto={openGallery} />}
-{activePage === "history" && <Journal catches={catches} onChooseCatchPhoto={openSavedCatchPhotoPicker} uploadingCatchId={uploadingCatchId} />}
+{activePage === "history" && <JournalPage
+  entries={journalEntries}
+  catches={catches}
+  onSaveEntry={saveJournalEntry}
+  onDeleteEntry={deleteJournalEntry}
+  onChooseCatchPhoto={openSavedCatchPhotoPicker}
+  uploadingCatchId={uploadingCatchId}
+  onSaveCatch={saveOwnedCatch}
+  onDeleteCatch={deleteOwnedCatch}
+/>}
     {activePage === "leaderboard" && <Leaderboard catches={communityCatches} onLogCatch={() => setActivePage("log")} />}
     {activePage === "knots" && <Knots customKnots={customKnots} onAddCustomKnot={addCustomKnot} onRemoveCustomKnot={removeCustomKnot} />}
     {activePage === "flytying" && <FlyTying customFlies={customFlies} onAddCustomFly={addCustomFly} onRemoveCustomFly={removeCustomFly} />}
